@@ -1,6 +1,6 @@
 # DSC180-A08-GUI-Project
 
-## Part II — Online Data Evaluation (Based on ZeroGUI's framework)
+## Part I — Online Data Evaluation (Based on ZeroGUI's framework)
 📝 **Status:** AndroidWorld environment is interactive; adapter wired. OSWorld/AndroidLab are inherently compatible. \
 🎯 **Goal:** Integrate AndroidWorld into online evaluation by running it inside Docker while exposing a ZeroGUI-compatible environment. \
 📈 **Next Step:** Try evaluation with the env that we've set up.
