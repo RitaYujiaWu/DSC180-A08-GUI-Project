@@ -78,14 +78,36 @@ python run_multienv_qwen3vl.py \
 </code></pre>
 
 ## Part II — Reward Labeling (Using GPT-5-mini)
-🎯 **Goal:** ... \
-📈 **Next Step:** ...
+🎯 **Goal:** Convert raw GUI trajectories (screenshots + actions) into step-wise, scalar rewards using a multimodal LLM (GPT-5-mini), so we can train a Process Reward Model (PRM) that scores each action in context. \
+📈 **Next Step:** Aggregate the annotated trajectories into a PRM-friendly format and plug it into the fine-tuning pipeline in Part III. \
 
 ### TL;DR
--	...
-### 1. Project Layout
-...
+- We take trajectories generated in Part I (`traj.jsonl` + screenshots) as input.
+- For each step, we load the task instruction, compare BEFORE/AFTER screenshots, and call GPT-5-mini to assign a reward in \[0.0, 1.0\] plus a brief reason.
+- We write one JSON line per trajectory with all steps annotated, which becomes the supervision data for training the PRM.
 
+Before running, set the environment variable `EXAMPLES_ROOT` to point to your OSWorld examples directory, for example:
+```bash
+export EXAMPLES_ROOT=YOUR_PATH/OSWorld/evaluation_examples/examples
+```
+
+### 1. Dry Run (no API calls)
+<pre><code>cd YOUR_PATH/PRM_baseline/reward
+python step_rewards_annotation.py \
+  --base-dir YOUR_PATH/OSWorld/results/generated_maxstep25_sleep0.5 \
+  --output-file YOUR_PATH/PRM_baseline/reward/annotated_traj_debug.jsonl \
+  --model openai/gpt-5-mini \
+  --workers 1 \
+  --dry-run
+</code></pre>
+### 2. Full Annotation Run (with API)
+<pre><code>cd YOUR_PATH/PRM_baseline/reward
+python step_rewards_annotation.py \
+  --base-dir YOUR_PATH/OSWorld/results/generated_maxstep25_sleep0.5 \
+  --output-file YOUR_PATH/PRM_baseline/reward/annotated_traj.jsonl \
+  --model openai/gpt-5-mini \
+  --workers 16
+</code></pre>
 
 ## Part III — Finetuning  (Based on Llama Factory's framework)
 🎯 **Goal:** Fine-tune Qwen3VL-4b on the collected trajectory with reward. \
