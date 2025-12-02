@@ -1,3 +1,9 @@
+# DSC180 A08 Capstone Project - GUI Agent
+Right now, there’s a lot of excitement around GUI agents, AI agents interact with graphical user interfaces—things like apps, browsers, and operating systems. Therefore, we choose this as our topic and focus on improving GUI agent performance through inference-time scaling. \
+
+Our team is then split into two groups that strengthen the agent from complementary directions: one group trains a Process Reward Model (PRM) as an external signal [(Jump to Part A)](#part-a), while the other develops an internal world model to enhance the agent’s own reasoning [(Jump to Part B)](#part-b).
+
+<a name="part-a"></a>
 # A. Training a Process Reward Model (PRM) for GUI Agent
 ## Part I — Task Generation and Collecting Agent Trajectory (Based on ZeroGUI and OSWorld's framework)
 🎯 **Goal:** Use ZeroGUI's prompt for task generation based on OSWorld's tasks and then collect trajectory using Qwen3VL-4b as agent. \
@@ -134,5 +140,8 @@ You could play with the action by changing `action_payload`
 </code></pre>
 And you should see the corresponding screenshots/empty reward of your interactions.
 
+[(Jump back to Part A)](#part-a)
+
+<a name="part-b"></a>
 # B. Training Internal "World Model"...
 ...
