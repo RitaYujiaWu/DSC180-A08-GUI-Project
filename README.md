@@ -86,7 +86,7 @@ python run_multienv_qwen3vl.py \
 - For each step, we load the task instruction, compare BEFORE/AFTER screenshots, and call GPT-5-mini to assign a reward in \[0.0, 1.0\] plus a brief reason.
 - We write one JSON line per trajectory with all steps annotated, which becomes the supervision data for training the PRM.
 
-Before running, set the environment variable `EXAMPLES_ROOT` to point to your OSWorld examples directory, for example:
+Before running, set the environment variable `EXAMPLES_ROOT` to point to your OSWorld examples directory:
 ```bash
 export EXAMPLES_ROOT=YOUR_PATH/OSWorld/evaluation_examples/examples
 ```
