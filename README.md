@@ -79,7 +79,7 @@ python run_multienv_qwen3vl.py \
 
 ## Part II — Reward Labeling (Using GPT-5-mini)
 🎯 **Goal:** Convert raw GUI trajectories (screenshots + actions) into step-wise, scalar rewards using a multimodal LLM (GPT-5-mini), so we can train a Process Reward Model (PRM) that scores each action in context. \
-📈 **Next Step:** Aggregate the annotated trajectories into a PRM-friendly format and plug it into the fine-tuning pipeline in Part III. \
+📈 **Next Step:** Aggregate the annotated trajectories into a PRM-friendly format and plug it into the fine-tuning pipeline in Part III.
 
 ### TL;DR
 - We take trajectories generated in Part I (`traj.jsonl` + screenshots) as input.
