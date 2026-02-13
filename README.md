@@ -109,23 +109,75 @@ python step_rewards_annotation.py \
   --workers 16
 </code></pre>
 
-## Part III — Finetuning  (Based on Llama Factory's framework)
+## Part III — PRM Finetuning  (Based on Llama Factory's framework)
 🎯 **Goal:** Fine-tune Qwen3VL-4b on the collected trajectory with reward. \
 📈 **Next Step:** Keep testing and refining so the data and fine-tuning works best.
 
-To fine-tune, `git clone` Llama Factory's [repo](https://github.com/hiyouga/LLaMA-Factory), follow the setup instructions,
-and finally run:
-<pre><code> python YOUR_PATH/infer_qwen3vl_baseline.py \
-  --model_name Qwen/Qwen3-VL-4B-Instruct \
-  --trust_remote_code \
-  --input_jsonl YOUR_PATH/o3_15steps_llamafactory_sft.jsonl \
-  --output_jsonl YOUR_PATH/o3_15steps_infer_qwen3vl.jsonl \
-  --max_images 4 \
-  --max_samples 64 \
-  --max_new_tokens 256 \
-  --temperature 0.2</code></pre>
+To fine-tune, `git clone` Llama Factory's [repo](https://github.com/hiyouga/LLaMA-Factory), follow the setup instructions. \
+Add the file `PRM_baseline/agent/convert_to_llamafactory.py` under `YOUR_ROOT/LLaMA-Factory` and run:
+<pre><code>python3 YOUR_ROOT/LLaMA-Factory/convert_to_llamafactory.py \
+  --annotated-jsonl (jsonl path of the annotated data) \
+  --output YOUR_ROOT/LLaMA-Factory/annot_windows.jsonl (targeted output path) \
+  --window-size (context window length) \
+  --max-images -1 (keep as -1, unless you want the first few images only for the whole case and dispose of the others)
+</code></pre>
+Add the following to the end of the file `YOUR_ROOT/LLaMA-Factorydata/dataset_info.json`:
+<pre><code>"annot_windows": {
+    "file_name": "YOUR_ROOT/LLaMA-Factory/annot_windows.jsonl",
+    "formatting": "sharegpt",
+    "columns": { "messages": "conversations", "images": "images" },
+    "tags": { "role_tag": "role", "content_tag": "content", "user_tag": "user", "assistant_tag": "assistant" }
+  }</code></pre>
+Then, run finetuning using the following (with your desired settings and available GPUs):
+<pre><code>CUDA_VISIBLE_DEVICES=3,5 python -m llamafactory.cli train \
+  --stage sft \
+  --model_name_or_path Qwen/Qwen3-VL-4B-Instruct \
+  --trust_remote_code True \
+  --dataset annot_windows \
+  --dataset_dir YOUR_ROOT/LLaMA-Factory/data \
+  --output_dir YOUR_ROOT/qwen3vl_sft_annot_ckpts \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 16 \
+  --learning_rate 1e-5 \
+  --num_train_epochs 10 \
+  --cutoff_len 3072 \
+  --fp16 \
+  --gradient_checkpointing \
+  --freeze_vision_tower \
+  --freeze_multi_modal_projector \
+  --template qwen2_vl \
+  --do_train True \
+  --eval_strategy no \
+  --save_strategy steps \
+  --save_steps 150 \
+  --logging_steps 1 \
+  --report_to wandb \
+  --run_name qwen3vl_sft_annot_run1</code></pre>
+Finally, save your trained PRM:
+<pre><code>python -m llamafactory.cli export \
+  --model_name_or_path Qwen/Qwen3-VL-4B-Instruct \
+  --adapter_name_or_path YOUR_ROOT/qwen3vl_sft_annot_ckpts/YOUR_CKPT \
+  --export_dir YOUR_ROOT/qwen3vl_merged_final</code></pre>
 
-## Part IV — Online Data Evaluation (Based on ZeroGUI's framework)
+## Part IV — Agent RL Training with PRM (Started with PPO)
+🎯 **Goal:** Train the agent using RL with PRM. \
+📈 **Next Step:** Keep testing and refining to find the best policy/parameter settings.
+
+To start, locally host your trained PRM using vllm (adjust the settings based on your available GPUs):
+<pre><code>CUDA_VISIBLE_DEVICES=0 \
+python -m vllm.entrypoints.openai.api_server \
+  --model YOUR_ROOT/qwen3vl_merged_final \
+  --served-model-name qwen3vl-prm \
+  --gpu_memory_utilization 0.75 \
+  --host 0.0.0.0 \
+  --port 8003</code></pre>
+Then, change or modify your desired settings in `agent_training_prm/configs/train.yaml` \
+Start training by (setting the GPUs to your available ones and change num_processes accordingly):
+<pre><code>cd agent_training_prm
+CUDA_VISIBLE_DEVICES=0,5 accelerate launch --num_processes 2 -m src.train --config configs/train.yaml</code></pre>
+This code will automatically connect to OSWorld and start docker environment. During the rollout, PRM will give a reward of 0/1 for bad/good actions. Finally, the loss will be calculated, and the policy will be updated accordingly. The training checkpoint and trajectory logs can be found in `agent_training_prm/runs`, which is updated during the training.
+
+## Part V — Online Data Evaluation (Based on ZeroGUI's framework)
 📝 **Status:** AndroidWorld environment is interactive; adapter wired. OSWorld/AndroidLab are inherently compatible. \
 🎯 **Goal:** Integrate AndroidWorld into online evaluation by running it inside Docker while exposing a ZeroGUI-compatible environment. \
 📈 **Next Step:** Try evaluation with the env that we've set up.
