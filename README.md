@@ -242,6 +242,19 @@ world_model/
 │   └── compute_success_rate.py     # Evaluation utility
 │
 └── failure_traj_analysis/
+    ├── world_model_supplement/         # Enhanced internal world model
+    │   ├── internal_world_model.py     # Main orchestrator
+    │   ├── action_ranker.py            # Success–failure margin reranking
+    │   ├── contrastive_memory.py       # Dual success/failure retrieval
+    │   ├── embedding_backend.py        # CLIP / latent embedding backends
+    │   ├── contrastive_analyzer.py     # Contrastive pattern extraction
+    │   ├── guidance_generator.py       # Step & initial guidance formatting
+    │   ├── prompt_templates.py         # Prompt definitions
+    │   ├── llm_utils.py                # LLM adapters
+    │   ├── runtime_factory.py          # vLLM integration helpers
+    │   ├── vllm_openai_client.py       # OpenAI-compatible client for vLLM
+    │   └── utils.py                    # Shared utilities
+    │
     ├── critical_error_detection.py # Root cause identification
     ├── experience_memory.py        # Memory retrieval system
     ├── fine_grained_analysis.py    # Detailed error analysis
