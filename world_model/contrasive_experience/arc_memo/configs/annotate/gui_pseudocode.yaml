@@ -1,0 +1,37 @@
+# @package _global_
+
+defaults:
+  - default
+
+# GUI Agent Pseudocode Generation Configuration
+
+annotate:
+  # Input files
+  hand_annotations_file: "data/abstract_anno/gui/example_annotations.yaml"
+  example_concepts: "data/abstract_anno/gui/example_concepts.yaml"
+  
+  # Optional input files
+  trajectories: "/home/wenyi/CoMEM-Agent/CoMEM-Agent-Inference/arc_memo/data/webvoyager_memory/extracted_trajectories.json"  # Path to trajectory JSON file
+  task_descriptions: "/home/wenyi/CoMEM-Agent/CoMEM-Agent-Inference/arc_memo/data/webvoyager_memory/extracted_task_descriptions.json"  # Path to task descriptions JSON file
+  task_ids: null  # Path to task ID list JSON file
+  
+  # Processing limits
+  limit_tasks: 10  # Limit number of tasks to process (null = all)
+  
+  # Model configuration
+  model:
+    server_url: "http://localhost:8000/v1"
+    name: "Qwen/Qwen2.5-VL-7B-Instruct"
+    api_key: "EMPTY"
+  
+  # Generation configuration
+  generation:
+    temperature: 0.1
+    max_tokens: 2048
+    n: 1
+  
+  # Batch processing
+  batch_size: 1
+
+# Dry run mode
+dry_run: false
