@@ -229,17 +229,44 @@ The world model provides two complementary capabilities:
 
 ### Project Layout
 
+`contrasive_experience/` contains the complete CoMEM-Agent inference system, including the agent, browser environment, memory systems, and evaluation benchmarks.
+
 ```
 world_model/
-├── contrasive_experience/
-│   ├── world_model/
-│   │   ├── world_model.py          # Main orchestrator
-│   │   ├── trajectory_store.py     # FAISS-indexed trajectory storage
-│   │   ├── trajectory_analyzer.py  # Contrastive pair analysis
-│   │   ├── contrastive_summarizer.py # Text summary generation
-│   │   ├── state_predictor.py      # Action outcome prediction
-│   │   └── prompts/                # Prompt templates
-│   └── compute_success_rate.py     # Evaluation utility
+├── contrasive_experience/              # Full CoMEM-Agent inference system
+│   ├── run.py / run_chunks.py          # Entry points
+│   ├── run_all_domains.sh              # Run all evaluation domains
+│   ├── config/                         # CLI argument definitions
+│   │
+│   ├── agent/                          # FunctionCallAgent + LLM configs + prompts
+│   ├── browser_env/                    # Playwright browser automation
+│   ├── actions/                        # Action creation and parsing
+│   ├── action_scaling/                 # Historical state-action matching
+│   │
+│   ├── memory/                         # Experience memory + reasoning bank
+│   ├── arc_memo/                       # Concept memory (ArcMemo)
+│   ├── graph_memory/                   # Graph-based memory
+│   ├── hybrid_memory/                  # Hybrid memory system
+│   ├── memory_evolution/               # Data flywheel pipeline
+│   │
+│   ├── world_model/                    # Contrastive learning world model
+│   │   ├── world_model.py              # Main orchestrator
+│   │   ├── trajectory_store.py         # FAISS-indexed trajectory storage
+│   │   ├── trajectory_analyzer.py      # Contrastive pair analysis
+│   │   ├── contrastive_summarizer.py   # Text summary generation
+│   │   ├── state_predictor.py          # Action outcome prediction
+│   │   └── prompts/                    # Prompt templates
+│   │
+│   ├── tools/                          # GUI tools, analysis tools, web search
+│   ├── benchmarks/                     # MMInA, Mind2Web, WebVoyager evaluators
+│   ├── scripts/                        # Runner and ablation scripts
+│   ├── utils/                          # Shared utilities
+│   ├── data_preparation/               # FAISS index building
+│   │
+│   ├── MMInA_evaluation/               # MMInA benchmark data
+│   ├── Mind2Web_evaluation/            # Mind2Web benchmark data
+│   ├── webvoyager_evaluation/          # WebVoyager benchmark data
+│   └── compute_success_rate.py         # Evaluation utility
 │
 └── failure_traj_analysis/
     ├── world_model_supplement/         # Enhanced internal world model

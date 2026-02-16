@@ -181,5 +181,7 @@ videos/
 *similar_states_*.html
 *.faiss 
 *.embeddings.npy
-*.npyCoMEM-Agent-Inference/arc_memo/output/
-CoMEM-Agent-Inference/downloaded_datasets/
+*.npy
+arc_memo/output/
+downloaded_datasets/
+media/
