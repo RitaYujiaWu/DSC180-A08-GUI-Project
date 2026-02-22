@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Inference-Time Scaling for GUI Agents | DSC180 A08</title>
+  <meta name="description" content="Improving GUI agent reliability with Process Reward Models and Internal World Models. DSC180 A08 Capstone.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <p class="label">DSC180 A08 Capstone · Quarter 2</p>
+      <h1>Inference-Time Scaling for GUI Agents with Process Reward Models and Internal World Models</h1>
+      <p class="tagline">Making long-horizon GUI agents more reliable—without simply training bigger models.</p>
+      <div class="team">
+        <span>Bella Wang</span>
+        <span>Rita Yujia Wu</span>
+        <span>Shuchang Liu</span>
+        <span>Ziyu Huang</span>
+        <span class="mentors">Mentors: Kun Zhou, Zhiting Hu</span>
+      </div>
+      <div class="header-links">
+        <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project" target="_blank" rel="noopener">Code</a>
+        <a href="pdfs/Q2_Project_Report_Checkpoint.pdf" target="_blank" rel="noopener">Report (PDF)</a>
+        <a href="pdfs/A08_2_Poster.pdf" target="_blank" rel="noopener">Poster (PDF)</a>
+      </div>
+    </div>
+  </header>
+
+  <nav class="nav-sticky" aria-label="Page sections">
+    <div class="nav-inner">
+      <a href="#introduction">Introduction</a>
+      <a href="#methods">Methods</a>
+      <a href="#results">Results</a>
+      <a href="#conclusion">Conclusion</a>
+    </div>
+  </nav>
+
+  <main>
+    <section id="introduction" class="section">
+      <div class="section-inner">
+        <h2>Introduction</h2>
+        <p class="lead">GUI agents are systems that can use real software like a person—they look at the screen, click buttons, type into forms, and navigate multi-step workflows across browsers, operating systems, and mobile apps. A capable agent could automate many everyday tasks end-to-end.</p>
+        <p>The hardest part is making these long sequences <strong>reliable</strong>. Instead of only scaling model size, we improve the agent by letting it take longer action sequences and consider more possibilities at <strong>inference time</strong>:</p>
+        <div class="two-col cards">
+          <article class="card">
+            <h3>Training with a Process Reward Model (PRM)</h3>
+            <p>Teaches the policy what "good progress" looks like at each step, so longer rollouts stay goal-directed—like a coach saying "yes, keep going" or "no, that's a detour" during learning.</p>
+          </article>
+          <article class="card">
+            <h3>Inference with an internal world model</h3>
+            <p>Dynamically retrieves contrastive past experience (successes and failures) to support think-before-acting reasoning and guide action selection—like recalling a similar situation on the spot.</p>
+          </article>
+        </div>
+        <p>By combining external PRM scoring with internal world-model guidance, we aim for higher success rates, fewer environment interactions, and better generalization than a baseline GUI agent without inference-time scaling.</p>
+      </div>
+    </section>
+
+    <section id="methods" class="section">
+      <div class="section-inner">
+        <h2>Methods</h2>
+
+        <h3 id="method-prm">Part A: Process Reward Model and PRM-Guided Agent Training</h3>
+        <p>We build a Process Reward Model that scores each step of a GUI trajectory given the task, screenshots, and actions. The pipeline:</p>
+        <ul>
+          <li><strong>Inputs (per step):</strong> task instruction (goal) + recent screenshots + the action the agent just took.</li>
+          <li><strong>PRM output:</strong> a progress score (0/1 or scaled to [0,1]) and an optional short reason (for debugging).</li>
+          <li><strong>How we fine-tune the PRM:</strong> generate and collect OSWorld trajectories → label each step with progress/no-progress using GPT-5-mini → fine-tune a Qwen3-VL-4B model to predict the step score from the inputs above.</li>
+          <li><strong>How we train the agent with the PRM:</strong> use Qwen3-VL-4B as the policy backbone; during RL, after every action we query the PRM for a step reward and use that reward to update the agent policy so longer rollouts stay goal-directed.</li>
+        </ul>
+        <div class="figure-placeholder" aria-label="Pipeline diagram placeholder">
+          <p><strong>[Placeholder: PRM pipeline flow diagram]</strong></p>
+          <p class="placeholder-note">Pipeline figure will be updated. (Task generation → Trajectory collection → Reward labeling → PRM fine-tuning → Agent RL training.)</p>
+        </div>
+
+        <h3 id="method-world">Part B: Internal World Model</h3>
+        <p><strong>Goal:</strong> Improve long-horizon GUI reliability by helping the agent think before acting via contrastive retrieval of past successes and failures, reducing repeated failure patterns.</p>
+        <ul>
+          <li><strong>Experience abstraction.</strong> Agent trajectories are converted into structured memory items and indexed with FAISS. We maintain separate memory banks for successful and failed trajectories to enable contrastive retrieval at inference time.</li>
+          <li><strong>Candidate-action guidance.</strong> At each step, the agent evaluates multiple candidate actions. The world model retrieves similar past trajectories and uses contrastive evidence to prioritize actions aligned with successful behaviors while avoiding known failure patterns.</li>
+          <li><strong>Contrastive world model pipeline.</strong> Given the current screenshot and task, the system: (1) retrieves top-k success and failure trajectories via FAISS + CLIP embeddings; (2) analyzes divergence points between successful and failed action sequences; (3) summarizes key success patterns and common pitfalls into ~200-token guidance; (4) injects guidance into the agent prompt (initial + step-level). We also use confidence checks and evidence aggregation to stabilize guidance when retrieval signals are weak or ambiguous.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="results" class="section">
+      <div class="section-inner">
+        <h2>Results</h2>
+
+        <h3>PRM evaluation (OSWorld)</h3>
+        <p>After PRM fine-tuning on 184 generated training tasks, we evaluated on the OSWorld 39-task test split. Each trajectory was truncated into 3-step windows, yielding 505 PRM-evaluated examples. Pred=True means the PRM predicts a positive step (reward &gt; 0).</p>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Model / Setting</th>
+                <th>TP</th>
+                <th>FP</th>
+                <th>FN</th>
+                <th>TN</th>
+                <th>Acc.</th>
+                <th>Prec.</th>
+                <th>Rec.</th>
+                <th>F1</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Qwen3-VL-4B (zero-shot PRM)</td>
+                <td>111</td>
+                <td>9</td>
+                <td>304</td>
+                <td>81</td>
+                <td>38.02%</td>
+                <td>92.50%</td>
+                <td>26.75%</td>
+                <td>41.50%</td>
+              </tr>
+              <tr>
+                <td>Fine-tuned PRM (LLaMA-Factory)</td>
+                <td>313</td>
+                <td>41</td>
+                <td>102</td>
+                <td>49</td>
+                <td>71.68%</td>
+                <td>88.42%</td>
+                <td>75.42%</td>
+                <td>81.40%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Fine-tuning yields a clear improvement: accuracy increases from 38.02% to 71.68%, with a substantial reduction in false negatives (higher recall) while precision remains high.</p>
+
+        <h3>Agent evaluation (planning benchmarks)</h3>
+        <div class="figure-placeholder" aria-label="Agent benchmark table placeholder">
+          <p><strong>[Placeholder: Agent benchmark table]</strong></p>
+          <p class="placeholder-note">Results are in progress. Table will show trained agent performance on various planning benchmarks (e.g., OSWorld, AndroidWorld).</p>
+        </div>
+
+        <h3>World model evaluation (WebVoyager)</h3>
+        <p>We compare a CoMEM-style success-only retrieval baseline against our contrastive (success + failure) retrieval with dynamic step-level guidance. Setup: top-k=3 success + 3 failure trajectories per step (FAISS + CLIP); dynamic re-retrieval each step. On average, 40% of retrieved trajectories change between step 0 and step 5.</p>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Domain</th>
+                <th>Baseline</th>
+                <th>World Model</th>
+                <th>∆ (pp)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Google Maps</td>
+                <td>16.67%</td>
+                <td>26.83%</td>
+                <td>+10.16</td>
+              </tr>
+              <tr>
+                <td>Amazon</td>
+                <td>19.51%</td>
+                <td>39.02%</td>
+                <td>+19.51</td>
+              </tr>
+              <tr>
+                <td>Allrecipes</td>
+                <td>15.91%</td>
+                <td>11.11%</td>
+                <td>-4.80</td>
+              </tr>
+              <tr>
+                <td>Coursera</td>
+                <td>2.38%</td>
+                <td>9.52%</td>
+                <td>+7.14</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The contrastive world model improves success rate on 3 of 4 domains, with the largest gain on Amazon. Allrecipes shows a regression; we are investigating domain-specific retrieval and confidence filtering.</p>
+
+        <h3>Combined methods (in progress)</h3>
+        <p>We are combining PRM-guided training with the contrastive internal world model to study whether external process supervision and internal retrieval-based reasoning provide complementary benefits. Preliminary findings: the combined agent shows more consistent multi-step behavior and fewer obvious failure loops; contrastive guidance is most helpful when the PRM-trained policy faces ambiguous GUI states.</p>
+      </div>
+    </section>
+
+    <section id="conclusion" class="section">
+      <div class="section-inner">
+        <h2>Conclusion</h2>
+        <p><strong>PRM-guided agent training:</strong> We built and curated datasets for PRM training, fine-tuned a PRM, and used it to provide dense step-wise rewards for GUI-agent training. Further result analysis and evaluation (including agent benchmark table) are ongoing.</p>
+        <p><strong>Internal world model:</strong> We introduced a contrastive memory mechanism that retrieves both successful and failed trajectories to provide step-level guidance during inference. We built dual FAISS indices (success vs. failure) with CLIP embeddings, and re-retrieval at each step keeps guidance aligned with the current GUI state. Empirically, we improve WebVoyager success rate on 3/4 domains (largest gain on Amazon), while highlighting retrieval sensitivity on heterogeneous sites.</p>
+        <p><strong>Combined effect:</strong> The PRM improves the base policy at training time; the world model stabilizes decision-making at deployment. Together they illustrate how inference-time scaling—without increasing model size—can improve GUI agent reliability.</p>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      <div class="section-inner">
+        <p><strong>Code:</strong> <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project" target="_blank" rel="noopener">github.com/RitaYujiaWu/DSC180-A08-GUI-Project</a></p>
+        <p class="footer-note">DSC180 A08 Capstone · Quarter 2 Project · Placeholders: PRM pipeline flow diagram, agent benchmark table.</p>
+      </div>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
