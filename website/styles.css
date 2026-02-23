@@ -235,6 +235,28 @@ code {
   border: 1px solid var(--border);
 }
 
+/* Poster-style figures */
+.poster-fig {
+  margin: 1.5rem 0;
+  text-align: center;
+}
+
+.poster-fig img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.poster-fig figcaption {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+  line-height: 1.4;
+}
+
 /* Placeholder blocks */
 .figure-placeholder {
   background: var(--surface);

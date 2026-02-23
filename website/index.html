@@ -45,6 +45,11 @@
       <div class="section-inner">
         <h2>Introduction</h2>
         <p class="lead">GUI agents are systems that can use real software like a person—they look at the screen, click buttons, type into forms, and navigate multi-step workflows across browsers, operating systems, and mobile apps. A capable agent could automate many everyday tasks end-to-end.</p>
+        <p>The figure below shows an example of a GUI agent completing one such task: finding a free slot, auto-filling the event and sending an invite, then confirming success.</p>
+        <figure class="poster-fig">
+          <img src="images/agent_example.png" alt="Agent example: three-step process (Finding a slot, Auto-fill &amp; invite, Success)" width="900" height="auto">
+          <figcaption>Agent example: Step 1 Finding a slot → Step 2 Auto-fill &amp; invite → Step 3 Success! Task complete.</figcaption>
+        </figure>
         <p>The hardest part is making these long sequences <strong>reliable</strong>. Instead of only scaling model size, we improve the agent by letting it take longer action sequences and consider more possibilities at <strong>inference time</strong>:</p>
         <div class="two-col cards">
           <article class="card">
@@ -65,25 +70,36 @@
         <h2>Methods</h2>
 
         <h3 id="method-prm">Part A: Process Reward Model and PRM-Guided Agent Training</h3>
-        <p>We build a Process Reward Model that scores each step of a GUI trajectory given the task, screenshots, and actions. The pipeline:</p>
+        <p>Our method is implemented according to the pipeline illustrated below.</p>
+        <figure class="poster-fig">
+          <img src="images/prm_workflow.png" alt="Process Reward Model Workflow: Input (action, screenshots, prompt) → Vision Language Model → Output (score 0/1, reason)" width="900" height="auto">
+          <figcaption>Process Reward Model workflow: inputs (agent action, screenshots, prompt) → Vision Language Model (Qwen3-VL-4B) → output (binary score, evaluation reason).</figcaption>
+        </figure>
+        <p>We build a Process Reward Model that scores each step of a GUI trajectory given the task, screenshots, and actions. In more detail:</p>
         <ul>
           <li><strong>Inputs (per step):</strong> task instruction (goal) + recent screenshots + the action the agent just took.</li>
           <li><strong>PRM output:</strong> a progress score (0/1 or scaled to [0,1]) and an optional short reason (for debugging).</li>
           <li><strong>How we fine-tune the PRM:</strong> generate and collect OSWorld trajectories → label each step with progress/no-progress using GPT-5-mini → fine-tune a Qwen3-VL-4B model to predict the step score from the inputs above.</li>
           <li><strong>How we train the agent with the PRM:</strong> use Qwen3-VL-4B as the policy backbone; during RL, after every action we query the PRM for a step reward and use that reward to update the agent policy so longer rollouts stay goal-directed.</li>
         </ul>
-        <div class="figure-placeholder" aria-label="Pipeline diagram placeholder">
-          <p><strong>[Placeholder: PRM pipeline flow diagram]</strong></p>
-          <p class="placeholder-note">Pipeline figure will be updated. (Task generation → Trajectory collection → Reward labeling → PRM fine-tuning → Agent RL training.)</p>
-        </div>
 
         <h3 id="method-world">Part B: Internal World Model</h3>
         <p><strong>Goal:</strong> Improve long-horizon GUI reliability by helping the agent think before acting via contrastive retrieval of past successes and failures, reducing repeated failure patterns.</p>
-        <ul>
-          <li><strong>Experience abstraction.</strong> Agent trajectories are converted into structured memory items and indexed with FAISS. We maintain separate memory banks for successful and failed trajectories to enable contrastive retrieval at inference time.</li>
-          <li><strong>Candidate-action guidance.</strong> At each step, the agent evaluates multiple candidate actions. The world model retrieves similar past trajectories and uses contrastive evidence to prioritize actions aligned with successful behaviors while avoiding known failure patterns.</li>
-          <li><strong>Contrastive world model pipeline.</strong> Given the current screenshot and task, the system: (1) retrieves top-k success and failure trajectories via FAISS + CLIP embeddings; (2) analyzes divergence points between successful and failed action sequences; (3) summarizes key success patterns and common pitfalls into ~200-token guidance; (4) injects guidance into the agent prompt (initial + step-level). We also use confidence checks and evidence aggregation to stabilize guidance when retrieval signals are weak or ambiguous.</li>
-        </ul>
+        <p><strong>Experience abstraction.</strong> Agent trajectories are converted into structured memory items and indexed with FAISS. We maintain separate memory banks for successful and failed trajectories to enable contrastive retrieval at inference time. The ReasoningBank below captures this flow: experience/trajectory → memory extraction → memory items → consolidation and retrieval.</p>
+        <figure class="poster-fig">
+          <img src="images/memory_abstraction.png" alt="ReasoningBank: memory retrieval, experience/trajectory, memory extraction, consolidation" width="750" height="auto">
+          <figcaption>ReasoningBank: experience/trajectory, memory extraction, and consolidation into memory items for retrieval.</figcaption>
+        </figure>
+        <p><strong>Candidate-action guidance.</strong> At each step, the agent evaluates multiple candidate actions. The world model retrieves similar past trajectories and uses contrastive evidence to prioritize actions aligned with successful behaviors while avoiding known failure patterns. The figure below contrasts the expert trajectory (green) with alternative actions and their resulting states.</p>
+        <figure class="poster-fig">
+          <img src="images/alternative_actions.png" alt="Expert trajectory vs alternative actions and resulting states" width="700" height="auto">
+          <figcaption>Expert trajectory (green) vs alternative actions and resulting states.</figcaption>
+        </figure>
+        <p><strong>Contrastive world model pipeline.</strong> Given the current screenshot and task, the system: (1) retrieves top-k success and failure trajectories via FAISS + CLIP embeddings; (2) analyzes divergence points between successful and failed action sequences; (3) summarizes key success patterns and common pitfalls into ~200-token guidance; (4) injects guidance into the agent prompt (initial + step-level). We also use confidence checks and evidence aggregation to stabilize guidance when retrieval signals are weak or ambiguous. This is supported by implicit world modeling: Stage 1 predicts next state given action (world modeling), and Stage 2 uses continual training to predict the action given state.</p>
+        <figure class="poster-fig">
+          <img src="images/world_model.png" alt="Implicit World Modeling: Stage 1 World Modeling, Stage 2 Continual Training" width="560" height="auto">
+          <figcaption>Implicit World Modeling: Stage 1 (world modeling P(ŝj|s,âj)) and Stage 2 (continual training P(a|s)).</figcaption>
+        </figure>
       </div>
     </section>
 
