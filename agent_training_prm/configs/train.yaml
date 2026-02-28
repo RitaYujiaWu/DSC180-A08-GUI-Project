@@ -20,7 +20,7 @@ env:
   cdp_wait_interval_s: 1.0
 
 prm:
-  base_url: "http://ds-serv11.ucsd.edu:8003/v1"
+  base_url: "YOUR_PRM_SERVING_ADDRESS" # e.g: http://serv.edu:8003/v1
   model: "qwen3vl-prm"
   timeout_s: 30
   max_retries: 2
