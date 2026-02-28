@@ -74,25 +74,25 @@ train:
   # If true, each GPU/rank runs its own OSWorld env + PRM for faster multi-GPU.
   # Note: one PPO update happens per episode *per rank*.
   rollout_per_rank: true
-  total_episodes: 330
+  total_episodes: 990  # 3 epochs over train.json 
   gamma: 0.99
   gae_lambda: 0.95
   lr: 1.0e-5
   clip_ratio: 0.2
   vf_coef: 0.5
   ent_coef: 0.01
-  train_epochs: 3
+  train_epochs: 1
   minibatch_size: 1
   grad_clip_norm: 1.0
 
 logging:
-  out_dir: "./runs/osworld_prm_ppo_lora_3epochs"
+  out_dir: "./runs/osworld_prm_ppo_lora_epoch1_2"
   log_every: 1
   # Write per-step screenshots under ${out_dir}/screenshots/epXXXX/.
   # Disable to reduce disk I/O.
   save_screenshots: false
   # Save ckpt once per epoch (one full pass over paths.test_all_meta_path).
-  save_every: 100
+  save_every: 110
 
   # Optional Weights & Biases logging.
   # Enable with: wandb.enabled: true
@@ -100,7 +100,7 @@ logging:
     enabled: true
     project: "osworld_prm_ppo"
     entity: null
-    name: osworld_prm_ppo_lora_4steps
+    name: osworld_prm_ppo_lora_4steps_epoch1_2
     group: null
     tags: []
     mode: "online"  # or: "offline"

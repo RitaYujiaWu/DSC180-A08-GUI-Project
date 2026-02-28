@@ -1,10 +1,19 @@
 # src/osworld_env.py
 from dataclasses import dataclass
 from typing import Any, Dict, Tuple, Optional
+import os
+import sys
 import time
 import json
+import inspect
+import http.client
 import urllib.request
 import urllib.error
+
+# Prefer OSWorld's bundled DesktopEnv implementation.
+_OSWORLD_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "third_party", "OSWorld"))
+if os.path.isdir(_OSWORLD_ROOT) and _OSWORLD_ROOT not in sys.path:
+    sys.path.insert(0, _OSWORLD_ROOT)
 
 from desktop_env.desktop_env import DesktopEnv
 
@@ -41,7 +50,15 @@ def _wait_for_cdp(host: str, port: int, timeout_s: int, interval_s: float) -> bo
                 obj = json.loads(resp.read().decode("utf-8", errors="ignore"))
                 if isinstance(obj, dict) and obj.get("webSocketDebuggerUrl"):
                     return True
-        except (urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError, TimeoutError):
+        except (
+            urllib.error.URLError,
+            urllib.error.HTTPError,
+            json.JSONDecodeError,
+            TimeoutError,
+            http.client.RemoteDisconnected,
+            ConnectionResetError,
+            OSError,
+        ):
             pass
         time.sleep(interval_s)
     return False
@@ -51,6 +68,13 @@ class OSWorldEnv:
     def __init__(self, cfg: EnvConfig):
         self.cfg = cfg
         require_a11y_tree = cfg.observation_type in ["a11y_tree", "screenshot_a11y_tree", "som"]
+
+        # For debugging/verification: record which DesktopEnv implementation is in use.
+        self.impl_info = {
+            "osworld_root": _OSWORLD_ROOT,
+            "desktop_env_module": getattr(DesktopEnv, "__module__", ""),
+            "desktop_env_file": inspect.getfile(DesktopEnv),
+        }
 
         self.env = DesktopEnv(
             path_to_vm=cfg.path_to_vm,
@@ -84,9 +108,8 @@ class OSWorldEnv:
     def step(self, action: str) -> Tuple[Any, float, bool, Dict[str, Any]]:
         self.steps += 1
 
-        # IMPORTANT: step executes action, then we sleep so next obs is “settled”
-        obs, env_reward, done, info = self.env.step(action)
-        time.sleep(float(self.cfg.sleep_after_execution_s))
+        # IMPORTANT: DesktopEnv.step already sleeps `pause` seconds before returning the next observation.
+        obs, env_reward, done, info = self.env.step(action, pause=float(self.cfg.sleep_after_execution_s))
 
         if self.steps >= self.cfg.max_steps:
             done = True

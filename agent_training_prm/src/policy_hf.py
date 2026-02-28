@@ -12,6 +12,13 @@ from PIL import Image
 from transformers import AutoProcessor
 
 try:
+    import flash_attn  # type: ignore  # noqa: F401
+
+    _HAS_FLASH_ATTN = True
+except Exception:
+    _HAS_FLASH_ATTN = False
+
+try:
     from transformers import AutoModelForVision2Seq  # type: ignore
 except Exception:
     from transformers.models.auto.modeling_auto import AutoModelForVision2Seq  # type: ignore
@@ -218,6 +225,17 @@ class PolicyConfig:
     max_new_tokens: int
     temperature: float
     top_p: float
+    # Text / combined token budget controls
+    max_input_tokens: Optional[int] = None
+    action_token_reserve: int = 64
+    truncation_side: str = "left"  # "left" or "right"
+    max_total_tokens: Optional[int] = None
+    min_text_tokens: int = 256
+    gradient_checkpointing: bool = True
+    # Vision token / memory control:
+    # If the screenshot has more pixels than this, we downscale it BEFORE feeding to the VLM.
+    # Keep this fairly high if you rely on pixel-accurate coordinate grounding.
+    max_image_pixels: int = 1600 * 1600
 
 
 def _get_hidden_size(model) -> int:
@@ -238,10 +256,16 @@ class ActorCriticVLM(nn.Module):
         torch_dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
 
         self.processor = AutoProcessor.from_pretrained(base_model_name, trust_remote_code=True)
+        model_load_kwargs = {
+            "torch_dtype": torch_dtype,
+            "trust_remote_code": True,
+        }
+        if torch.cuda.is_available() and _HAS_FLASH_ATTN:
+            model_load_kwargs["attn_implementation"] = "flash_attention_2"
+
         self.model = AutoModelForVision2Seq.from_pretrained(
             base_model_name,
-            torch_dtype=torch_dtype,
-            trust_remote_code=True,
+            **model_load_kwargs,
         )
 
         # Memory-friendly defaults for training
@@ -253,16 +277,23 @@ class ActorCriticVLM(nn.Module):
         hidden = _get_hidden_size(self.model)
         self.v_head = nn.Linear(hidden, 1).to(dtype=self.model.dtype)
 
-    def forward(self, **model_inputs):
+    def forward(self, logits_to_keep: int = 0, **model_inputs):
         """
         IMPORTANT MEMORY FIX:
         - Avoid output_hidden_states=True (stores all layers).
         - Prefer last_hidden_state if present; otherwise fall back to hidden_states[-1].
         """
+        model_kwargs = {
+            "output_hidden_states": False,
+            "use_cache": False,
+        }
+        if logits_to_keep is not None and int(logits_to_keep) > 0:
+            # Many Qwen-style models support this to avoid materializing logits for the full sequence.
+            model_kwargs["logits_to_keep"] = int(logits_to_keep)
+
         out = self.model(
             **model_inputs,
-            output_hidden_states=False,
-            use_cache=False,
+            **model_kwargs,
         )
 
         # Some models expose last_hidden_state; some don't.
@@ -273,6 +304,7 @@ class ActorCriticVLM(nn.Module):
                 **model_inputs,
                 output_hidden_states=True,
                 use_cache=False,
+                **({"logits_to_keep": int(logits_to_keep)} if logits_to_keep is not None and int(logits_to_keep) > 0 else {}),
             )
             if not hasattr(out2, "hidden_states") or out2.hidden_states is None:
                 raise RuntimeError("Model output does not contain hidden states.")
@@ -315,6 +347,21 @@ class HFPolicy:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
         self.opt = torch.optim.AdamW(self.net.parameters(), lr=lr)
+
+        # Optional memory saver
+        if bool(getattr(self.cfg, "gradient_checkpointing", False)):
+            try:
+                net_unwrapped = self._unwrap_net()
+                model = getattr(net_unwrapped, "model", None)
+                if model is not None and hasattr(model, "gradient_checkpointing_enable"):
+                    model.gradient_checkpointing_enable()
+                if model is not None and hasattr(model, "config"):
+                    try:
+                        model.config.use_cache = False
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         self._last_task_text: Optional[str] = None
         self._hist_responses: List[str] = []
@@ -422,13 +469,23 @@ class HFPolicy:
         Return a resized PIL image (no base64).
         Keeping PIL images avoids prompt text bloat and is what processors expect.
         """
-        max_pixels = 1600 * 1600
+        max_pixels = int(getattr(self.cfg, "max_image_pixels", 1600 * 1600))
         w, h = img.size
         if w * h > max_pixels:
             scale = (max_pixels / float(w * h)) ** 0.5
             nw = max(32, (int(w * scale) // 32) * 32)
             nh = max(32, (int(h * scale) // 32) * 32)
-            img = img.resize((nw, nh))
+            img = img.resize((nw, nh), resample=Image.BICUBIC)
+        return img.convert("RGB")
+
+    def _process_image_with_max_pixels(self, img: Image.Image, max_pixels: int) -> Image.Image:
+        max_pixels = int(max(32 * 32, max_pixels))
+        w, h = img.size
+        if w * h > max_pixels:
+            scale = (max_pixels / float(w * h)) ** 0.5
+            nw = max(32, (int(w * scale) // 32) * 32)
+            nh = max(32, (int(h * scale) // 32) * 32)
+            img = img.resize((nw, nh), resample=Image.BICUBIC)
         return img.convert("RGB")
 
     def _pil_to_png_bytes(self, img: Image.Image) -> bytes:
@@ -451,12 +508,16 @@ class HFPolicy:
           messages: list with {"type":"image"} placeholders only (NO base64 urls)
           images_list: PIL images aligned 1:1 with image placeholders in messages
         """
-        img = _decode_screenshot(obs)
-        if img is None:
+        raw_img = _decode_screenshot(obs)
+        if raw_img is None:
             raise RuntimeError("VLM-only policy requires obs['screenshot'] bytes.")
 
-        img = self._process_image(img)
-        screen_w, screen_h = img.size
+        # IMPORTANT:
+        # - Keep coordinate system tied to the *original* screenshot resolution.
+        # - Optionally downscale the image for the vision encoder to reduce vision tokens.
+        raw_w, raw_h = raw_img.size
+        img = self._process_image(raw_img)
+        model_w, model_h = img.size
 
         # Auto-reset when task changes
         if self._last_task_text is None or task_text != self._last_task_text:
@@ -466,15 +527,23 @@ class HFPolicy:
 
         obs_text = _obs_text_compact(obs)
 
+        downscale_note = (
+            f"(Note: screenshot fed to the model may be downscaled to {model_w}x{model_h} for efficiency.)\n\n"
+            if (raw_w, raw_h) != (model_w, model_h)
+            else "\n"
+        )
+
         instruction_prompt = (
             "Please generate the next move according to the UI screenshot, instruction and previous actions.\n\n"
             f"Instruction: {task_text}\n\n"
             "Previous actions / results:\n"
             f"{history_text if history_text.strip() else 'None'}\n\n"
+            f"Coordinate system: {raw_w}x{raw_h} absolute pixels.\n"
+            f"{downscale_note}"
             f"Observation (text summary):\n{obs_text}\n"
         )
 
-        system_prompt = self._osworld_system_prompt(screen_w=screen_w, screen_h=screen_h)
+        system_prompt = self._osworld_system_prompt(screen_w=raw_w, screen_h=raw_h)
 
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": [{"type": "text", "text": system_prompt}]}
@@ -539,6 +608,7 @@ class HFPolicy:
         self,
         messages: List[Dict[str, Any]],
         images: Union[None, Image.Image, List[Image.Image]],
+        max_text_tokens: Optional[int] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         IMPORTANT:
@@ -556,15 +626,103 @@ class HFPolicy:
 
         n_slots = _extract_image_slots(messages)
 
+        if max_text_tokens is None:
+            max_text_tokens = getattr(self.cfg, "max_input_tokens", None)
+        trunc_side = str(getattr(self.cfg, "truncation_side", "left") or "left").lower()
+
+        # IMPORTANT (Qwen3-VL): do NOT use tokenizer truncation for multimodal prompts.
+        # The processor validates special multimodal token counts; truncation='max_length'
+        # can cut required image tokens and trigger ValueError.
+        proc_kwargs: Dict[str, Any] = {"return_tensors": "pt"}
+        allow_truncation = (n_slots == 0)
+        if allow_truncation and max_text_tokens is not None:
+            proc_kwargs.update({"truncation": True, "max_length": int(max_text_tokens)})
+            if trunc_side in ("left", "right"):
+                proc_kwargs["truncation_side"] = trunc_side
+
         if n_slots == 0:
-            enc = self.processor(text=prompt, return_tensors="pt")
+            enc = self.processor(text=prompt, **proc_kwargs)
         else:
             if len(image_list) != n_slots:
                 raise RuntimeError(f"[HFPolicy] expects {n_slots} images, but got {len(image_list)}.")
-            enc = self.processor(text=prompt, images=image_list, return_tensors="pt")
+            enc = self.processor(text=prompt, images=image_list, **proc_kwargs)
+
+        # Fallback truncation if processor/tokenizer ignores truncation args.
+        # Only do this for text-only prompts; multimodal slicing can break image-token alignment.
+        if allow_truncation and max_text_tokens is not None and "input_ids" in enc and torch.is_tensor(enc["input_ids"]):
+            try:
+                ids = enc["input_ids"]
+                if ids.dim() == 2 and ids.shape[1] > int(max_text_tokens):
+                    if trunc_side == "right":
+                        sl = slice(0, int(max_text_tokens))
+                    else:
+                        sl = slice(int(ids.shape[1]) - int(max_text_tokens), int(ids.shape[1]))
+                    enc["input_ids"] = ids[:, sl]
+                    if "attention_mask" in enc and torch.is_tensor(enc["attention_mask"]):
+                        enc["attention_mask"] = enc["attention_mask"][:, sl]
+            except Exception:
+                pass
 
         enc = {k: v.to(self.cfg.device) for k, v in enc.items() if torch.is_tensor(v)}
         return enc
+
+    def _estimate_image_tokens(self, enc: Dict[str, torch.Tensor]) -> Optional[int]:
+        if "image_grid_thw" not in enc:
+            return None
+        try:
+            grid = enc["image_grid_thw"]
+            return int((grid[:, 0] * grid[:, 1] * grid[:, 2]).sum().item())
+        except Exception:
+            return None
+
+    def _encode_budgeted(
+        self,
+        messages: List[Dict[str, Any]],
+        images_list: List[Image.Image],
+        max_total_tokens: Optional[int],
+    ) -> Tuple[Dict[str, torch.Tensor], List[Image.Image]]:
+        """Encode with a combined (text + vision) token budget.
+
+        Total token estimate = len(input_ids) + sum(image_grid_thw).
+        If over budget, we try shrinking images first (when vision dominates),
+        otherwise we truncate text.
+        """
+        if max_total_tokens is None:
+            return self._encode(messages, images_list), images_list
+
+        budget = int(max_total_tokens)
+        min_text = int(max(1, getattr(self.cfg, "min_text_tokens", 256)))
+        reserve = int(max(0, getattr(self.cfg, "action_token_reserve", 64)))
+
+        max_pixels = int(getattr(self.cfg, "max_image_pixels", 1600 * 1600))
+        max_pixels = int(max(32 * 32, max_pixels))
+
+        # Start with configured text cap, but allow tightening.
+        text_cap: Optional[int] = getattr(self.cfg, "max_input_tokens", None)
+
+        for _ in range(8):
+            proc_images = [self._process_image_with_max_pixels(im, max_pixels) for im in images_list]
+            enc = self._encode(messages, proc_images, max_text_tokens=text_cap)
+            text_len = int(enc["input_ids"].shape[1]) if "input_ids" in enc else 0
+            img_tokens = int(self._estimate_image_tokens(enc) or 0)
+            total = int(text_len + img_tokens)
+
+            if total <= budget:
+                return enc, proc_images
+
+            max_img_allow = max(0, budget - min_text - reserve)
+            if img_tokens > max_img_allow and max_pixels > 256 * 256:
+                max_pixels = int(max(32 * 32, max_pixels * 0.75))
+                continue
+
+            text_allow = max(min_text, budget - img_tokens - reserve)
+            if text_cap is None or int(text_cap) > int(text_allow):
+                text_cap = int(text_allow)
+                continue
+
+            return enc, proc_images
+
+        return self._encode(messages, images_list, max_text_tokens=text_cap), images_list
 
     # ---------- scoring ----------
     def _score_action_text(
@@ -573,68 +731,155 @@ class HFPolicy:
         images_list: List[Image.Image],
         action_text: str,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        enc_prompt = self._encode(messages, images_list)
-        prompt_len = int(enc_prompt["input_ids"].shape[1])
+        base_budget = getattr(self.cfg, "max_total_tokens", None)
+        if base_budget is None:
+            budgets: List[Optional[int]] = [None]
+        else:
+            budgets = [int(base_budget), 8192, 6144, 4096]
 
-        full_msgs = messages + [{"role": "assistant", "content": [{"type": "text", "text": action_text + "\n"}]}]
-        enc_full = self._encode(full_msgs, images_list)
+        last_oom: Optional[BaseException] = None
+        for b in budgets:
+            try:
+                enc_prompt, used_images = self._encode_budgeted(messages, images_list, max_total_tokens=b)
+                prompt_len = int(enc_prompt["input_ids"].shape[1])
+                image_slots = _extract_image_slots(messages)
 
-        logits, values = self.net(**enc_full)
+                prompt_img_tokens = self._estimate_image_tokens(enc_prompt)
 
-        prompt_last_idx = max(0, prompt_len - 1)
-        v = values[0, prompt_last_idx]
+                full_msgs = messages + [{"role": "assistant", "content": [{"type": "text", "text": action_text + "\n"}]}]
+                enc_full, _used_images2 = self._encode_budgeted(full_msgs, used_images, max_total_tokens=b)
+                full_len = int(enc_full["attention_mask"][0].sum().item())
+                action_token_len = int(max(0, full_len - prompt_len))
 
-        input_ids = enc_full["input_ids"][0]
-        attn = enc_full["attention_mask"][0]
-        full_len = int(attn.sum().item())
+                full_img_tokens = self._estimate_image_tokens(enc_full)
 
-        start_tok = prompt_len
-        end_tok = full_len
+                print(
+                    "[token-debug] "
+                    f"prompt_text_tokens={prompt_len}, "
+                    f"full_text_tokens={full_len}, "
+                    f"action_tokens={action_token_len}, "
+                    f"image_slots={image_slots}, "
+                    f"image_inputs={len(used_images)}, "
+                    f"prompt_image_tokens={prompt_img_tokens}, "
+                    f"full_image_tokens={full_img_tokens}, "
+                    f"budget={b}"
+                )
 
-        if end_tok - start_tok <= 0 or start_tok == 0:
-            lp = torch.zeros((), device=self.cfg.device)
-            ent = torch.zeros((), device=self.cfg.device)
-            return lp, v, ent
+                logits_to_keep = int(action_token_len + 1)
+                logits, values = self.net(**enc_full, logits_to_keep=logits_to_keep)
 
-        logprobs_all = torch.log_softmax(logits[0], dim=-1)
-        tgt = input_ids[start_tok:end_tok]
-        pred_pos = torch.arange(start_tok - 1, end_tok - 1, device=self.cfg.device)
+                prompt_last_idx = max(0, prompt_len - 1)
+                v = values[0, prompt_last_idx]
 
-        lp = logprobs_all[pred_pos, :].gather(-1, tgt.unsqueeze(-1)).squeeze(-1).sum()
+                input_ids = enc_full["input_ids"][0]
+                attn = enc_full["attention_mask"][0]
+                full_len = int(attn.sum().item())
 
-        probs = torch.softmax(logits[0, pred_pos, :], dim=-1)
-        ent = -(probs * torch.log(probs + 1e-12)).sum(dim=-1).mean()
+                start_tok = prompt_len
+                end_tok = full_len
 
+                if end_tok - start_tok <= 0 or start_tok == 0:
+                    lp = torch.zeros((), device=self.cfg.device)
+                    ent = torch.zeros((), device=self.cfg.device)
+                    return lp, v, ent
+
+                logits_seq_len = int(logits.shape[1])
+                offset = int(max(0, full_len - logits_seq_len))
+
+                logprobs_all = torch.log_softmax(logits[0], dim=-1)
+                tgt = input_ids[start_tok:end_tok]
+                pred_pos = torch.arange(start_tok - 1, end_tok - 1, device=self.cfg.device) - offset
+
+                if pred_pos.numel() != tgt.numel() or pred_pos.min().item() < 0 or pred_pos.max().item() >= logits_seq_len:
+                    lp = torch.zeros((), device=self.cfg.device)
+                    ent = torch.zeros((), device=self.cfg.device)
+                    return lp, v, ent
+
+                lp = logprobs_all[pred_pos, :].gather(-1, tgt.unsqueeze(-1)).squeeze(-1).sum()
+
+                probs = torch.softmax(logits[0, pred_pos, :], dim=-1)
+                ent = -(probs * torch.log(probs + 1e-12)).sum(dim=-1).mean()
+
+                return lp, v, ent
+
+            except torch.OutOfMemoryError as e:
+                last_oom = e
+                if torch.cuda.is_available():
+                    try:
+                        torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                continue
+
+        lp = torch.zeros((), device=self.cfg.device)
+        v = torch.zeros((), device=self.cfg.device)
+        ent = torch.zeros((), device=self.cfg.device)
         return lp, v, ent
 
     # ---------- main API ----------
     @torch.no_grad()
-    def act(self, obs: Any, task_text: str, history_text: str) -> Tuple[str, float, float, Optional[bytes]]:
+    def act(
+        self,
+        obs: Any,
+        task_text: str,
+        history_text: str,
+        do_sample: bool = True,
+    ) -> Tuple[str, float, float, Optional[bytes]]:
         messages, images_list = self._build_messages(obs, task_text, history_text)
 
-        enc_prompt = self._encode(messages, images_list)
-
-        # value at prompt end (forward ok through wrapped net)
-        _, values = self.net(**enc_prompt)
-        v_prompt_last = float(values[0, -1].item())
+        base_budget = getattr(self.cfg, "max_total_tokens", None)
+        if base_budget is None:
+            budgets: List[Optional[int]] = [None]
+        else:
+            budgets = [int(base_budget), 8192, 6144, 4096]
 
         # DDP-safe access to underlying HF model for generate()
         net_unwrapped = self._unwrap_net()
         model_for_gen = net_unwrapped.model
 
-        gen_ids = model_for_gen.generate(
-            **enc_prompt,
-            max_new_tokens=int(self.cfg.max_new_tokens),
-            do_sample=True,
-            temperature=float(self.cfg.temperature),
-            top_p=float(self.cfg.top_p),
-            pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-        )
+        last_oom: Optional[BaseException] = None
+        response_text = ""
+        v_prompt_last = 0.0
 
-        prompt_len = enc_prompt["input_ids"].shape[1]
-        gen_only = gen_ids[0, prompt_len:]
-        response_text = self.tokenizer.decode(gen_only, skip_special_tokens=True).strip()
+        for b in budgets:
+            try:
+                enc_prompt, used_images = self._encode_budgeted(messages, images_list, max_total_tokens=b)
+
+                _, values = self.net(**enc_prompt)
+                v_prompt_last = float(values[0, -1].item())
+
+                gen_ids = model_for_gen.generate(
+                    **enc_prompt,
+                    max_new_tokens=int(self.cfg.max_new_tokens),
+                    do_sample=bool(do_sample),
+                    temperature=float(self.cfg.temperature),
+                    top_p=float(self.cfg.top_p),
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                )
+
+                prompt_len = enc_prompt["input_ids"].shape[1]
+                gen_only = gen_ids[0, prompt_len:]
+                response_text = self.tokenizer.decode(gen_only, skip_special_tokens=True).strip()
+                images_list = used_images
+                break
+
+            except torch.OutOfMemoryError as e:
+                last_oom = e
+                if torch.cuda.is_available():
+                    try:
+                        torch.cuda.empty_cache()
+                    except Exception:
+                        pass
+                continue
+
+        if not response_text and last_oom is not None:
+            env_action = "pyautogui.sleep(0.5)"
+            old_logprob = 0.0
+            ss_bytes = None
+            if isinstance(obs, dict) and isinstance(obs.get("screenshot", None), (bytes, bytearray)):
+                ss_bytes = bytes(obs["screenshot"])
+            return str(env_action), float(old_logprob), float(v_prompt_last), ss_bytes
 
         env_action = None
         tool_json = _extract_tool_call_json(response_text)
@@ -675,6 +920,20 @@ class HFPolicy:
     def update(self, loss: torch.Tensor, grad_clip_norm: float) -> Dict[str, float]:
         self.opt.zero_grad(set_to_none=True)
 
+        # If evaluate() had to fall back to constant zeros (e.g., OOM-safe path),
+        # the resulting PPO loss can become a pure constant without a grad_fn.
+        # Calling backward() would then raise:
+        #   RuntimeError: element 0 of tensors does not require grad...
+        # In that case, skip the optimizer step for this minibatch.
+        if not bool(getattr(loss, "requires_grad", False)):
+            try:
+                loss_val = float(loss.item())
+            except Exception:
+                loss_val = 0.0
+            if self.accelerator is None or getattr(self.accelerator, "is_main_process", True):
+                print("[warn] PPO loss has no grad; skipping optimizer step (likely fallback zeros / OOM).")
+            return {"loss": loss_val, "skipped_step": 1.0}
+
         if self.accelerator is not None:
             self.accelerator.backward(loss)
             if grad_clip_norm is not None and float(grad_clip_norm) > 0:
@@ -685,7 +944,7 @@ class HFPolicy:
                 torch.nn.utils.clip_grad_norm_(self.net.parameters(), float(grad_clip_norm))
 
         self.opt.step()
-        return {"loss": float(loss.item())}
+        return {"loss": float(loss.item()), "skipped_step": 0.0}
 
     def save(self, path: str) -> None:
         import os
@@ -754,7 +1013,8 @@ class HFPolicy:
                 v_list.append(torch.zeros((), device=self.cfg.device))
                 ent_list.append(torch.zeros((), device=self.cfg.device))
                 continue
-
+            print("new line... ")
+            print(f"{msgs=}, {len(imgs)=}, {actions[i]=}")
             lp, v, ent = self._score_action_text(msgs, imgs, actions[i])
             lp_list.append(lp)
             v_list.append(v)

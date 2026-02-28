@@ -126,8 +126,27 @@ def ppo_update(
             new_value = new_value.float()
             entropy = entropy.float()
 
-            # PPO ratio
-            ratio = torch.exp(new_logprob - mb_old_logprob)
+            # If evaluate() had to fall back to constant zeros (e.g., OOM-safe path),
+            # these tensors won't require grad and the PPO loss becomes a constant.
+            # Skip this minibatch to avoid crashing or logging misleading huge ratios.
+            if not (new_logprob.requires_grad or new_value.requires_grad or entropy.requires_grad):
+                last_stats = {
+                    "loss": 0.0,
+                    "policy_loss": 0.0,
+                    "value_loss": 0.0,
+                    "entropy": float(entropy.mean().item()) if entropy.numel() else 0.0,
+                    "ratio_mean": 1.0,
+                    "ratio_min": 1.0,
+                    "ratio_max": 1.0,
+                    "loss_total": 0.0,
+                    "skipped_step": 1.0,
+                }
+                continue
+
+            # PPO ratio (numerically safe)
+            log_ratio = new_logprob - mb_old_logprob
+            log_ratio = torch.clamp(log_ratio, -20.0, 20.0)
+            ratio = torch.exp(log_ratio)
 
             unclipped = ratio * mb_adv
             clipped = torch.clamp(
@@ -168,5 +187,9 @@ def ppo_update(
                     "ratio_max": float(ratio.max().item()),
                     "loss_total": float(loss.item()),
                 }
+
+                # Preserve explicit skip signal if update() decided to skip.
+                if "skipped_step" not in last_stats:
+                    last_stats["skipped_step"] = 0.0
 
     return last_stats
