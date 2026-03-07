@@ -342,24 +342,19 @@ world_model/
 │   └── compute_success_rate.py         # Evaluation utility
 │
 └── failure_traj_analysis/
-    ├── world_model_supplement/         # Enhanced internal world model
-    │   ├── internal_world_model.py     # Main orchestrator
-    │   ├── action_ranker.py            # Success–failure margin reranking
-    │   ├── contrastive_memory.py       # Dual success/failure retrieval
-    │   ├── embedding_backend.py        # CLIP / latent embedding backends
-    │   ├── contrastive_analyzer.py     # Contrastive pattern extraction
-    │   ├── guidance_generator.py       # Step & initial guidance formatting
-    │   ├── prompt_templates.py         # Prompt definitions
-    │   ├── llm_utils.py                # LLM adapters
-    │   ├── runtime_factory.py          # vLLM integration helpers
-    │   ├── vllm_openai_client.py       # OpenAI-compatible client for vLLM
-    │   └── utils.py                    # Shared utilities
+    ├── internal_world_model/           # Supplement to the contrasive_experience folder
+    │   ├── planner.py                  # Orchestrates planning and action selection
+    │   ├── schemas.py                  # Shared data structures for planner
+    │   ├── contrastive_retriever.py    # Retrieves contrastive success/failure trajectories
+    │   ├── candidate_generator.py      # Generates candidate next actions
+    │   ├── candidate_scorer.py         # Scores candidates using contrastive evidence
+    │   └── prompt_builder.py           # Builds prompts for planning modules
     │
-    ├── critical_error_detection.py # Root cause identification
-    ├── experience_memory.py        # Memory retrieval system
-    ├── fine_grained_analysis.py    # Detailed error analysis
-    ├── evaluator.py                # Evaluation utilities
-    └── early_stop.py               # Early stopping detection
+    ├── critical_error_detection.py     # Root cause identification
+    ├── experience_memory.py            # Memory retrieval system
+    ├── fine_grained_analysis.py        # Detailed error analysis
+    ├── evaluator.py                    # Evaluation utilities
+    └── early_stop.py                   # Early stopping detection
 ```
 
 ## Part I — Contrastive Experience Learning
