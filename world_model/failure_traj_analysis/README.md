@@ -73,7 +73,7 @@ This extracted module currently contains:
 
 ```
 failure_traj_analysis/
-├──internal_world_model
+├── internal_world_model
 ├── critical_error_detection.py
 ├── early_stop.py
 ├── evaluator.py
