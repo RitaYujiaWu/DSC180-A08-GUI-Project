@@ -342,7 +342,7 @@ world_model/
 │   └── compute_success_rate.py         # Evaluation utility
 │
 └── failure_traj_analysis/
-    ├── internal_world_model/           # Supplement to the contrasive_experience folder
+    ├── internal_world_model/           # Supplement based on the contrasive_experience folder
     │   ├── planner.py                  # Orchestrates planning and action selection
     │   ├── schemas.py                  # Shared data structures for planner
     │   ├── contrastive_retriever.py    # Retrieves contrastive success/failure trajectories
