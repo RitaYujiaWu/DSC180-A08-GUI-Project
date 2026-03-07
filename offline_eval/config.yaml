@@ -7,19 +7,14 @@ base_model: "Qwen/Qwen3-VL-4B-Instruct"
 # Optional: LoRA adapter directory (e.g. ckpt_ep220). Leave empty for baseline.
 lora_path: ""
 
-# Paths (adjust to your clone layout)
-infigui_root: "/path/to/InfiGUI-G1"          # Clone of InfiGUI-G1 eval repo
-uiagile_root: "/path/to/UI-AGILE"            # Clone of UI-AGILE (for AndroidControl)
-mind2web_repo: "/path/to/Mind2Web"           # Clone of Mind2Web (for dom_utils)
-
-# Data (under InfiGUI-G1 or symlinked)
-# - ui-vision: infigui_root/data/ui-vision/
-# - mmbench-gui: infigui_root/data/MMBench-GUI/
-# - mind2web: infigui_root/data/mind2web/ (scores_all_data.pkl + test_website/, etc.)
-# - AndroidControl: UI-AGILE/android_control/*.parquet
+# Data
+# - ui-vision: PATH_TO/data/ui-vision/
+# - mmbench-gui: PATH_TO/data/MMBench-GUI/
+# - mind2web: PATH_TO/data/mind2web/ (scores_all_data.pkl + test_website/, etc.)
+# - AndroidControl: PATH_TO/android_control/*.parquet
 
 # Output base (results will be under output/{model_name}/{benchmark}/)
-output_root: null   # null = use infigui_root/output
+output_root: null   # null = use ./results/output_root
 ac_output_root: null  # null = use ./results/android_control
 
 # Eval settings
