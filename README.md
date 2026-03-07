@@ -177,45 +177,38 @@ Start training by (setting the GPUs to your available ones and change num_proces
 CUDA_VISIBLE_DEVICES=0,5 accelerate launch --num_processes 2 -m src.train --config configs/train.yaml</code></pre>
 This code will automatically connect to OSWorld and start docker environment. During the rollout, PRM will give a reward of 0/1 for bad/good actions. Finally, the loss will be calculated, and the policy will be updated accordingly. The training checkpoint and trajectory logs can be found in `agent_training_prm/runs`, which is updated during the training.
 
-## Part V — Online Data Evaluation (Based on ZeroGUI's framework)
-📝 **Status:** AndroidWorld environment is interactive; adapter wired. OSWorld/AndroidLab are inherently compatible. \
-🎯 **Goal:** Integrate AndroidWorld into online evaluation by running it inside Docker while exposing a ZeroGUI-compatible environment. \
-📈 **Next Step:** Try evaluation with the env that we've set up.
+## Part V — Online Data Evaluation
+🎯 **Goal:** Evaluate the base model and LoRA-trained agent on two online benchmarks (Android World, Android Lab) so we can compare before/after training. This part of evaluation includes interacting with virtual environments. \
 
-### TL;DR
--	We run AndroidWorld in a Docker container.
--	We added an adapter android_world_env.py so ZeroGUI can call the env in its usual way.
--	You can smoke-test the interaction in notebooks/docker_exp.ipynb.
-
-### 1. Project Layout
-Move the files under `/online_eval` folder to the ZeroGUI repo cloned in Part I. Please move them to the designated place as shown:
-<pre><code>repo-root/
-  zerogui/
-    openrlhf/
-      env/
-        __init__.py
-        ...
-        osworld_env.py
-        android_lab_env.py
-        android_world_env.py     # <-- our adapter (new)
-    ...
-    docker_exp.ipynb             # <-- end-to-end sanity test
+### 1. Clone Repo/Pull Data from Official Benchmark Providers.
+First, `git clone` two benchmarks: [Android World](https://github.com/google-research/android_world) and [Android Lab](https://github.com/THUDM/Android-Lab) and follow all their setups\
+Move the `config.yaml` file under `/online_eval` folder to the root of the Android Lab repo cloned. 
+### 2. Build / Run the Docker Container
+Build and run the Docker container for **Android World** following: [🔗world docker setup](https://github.com/google-research/android_world?tab=readme-ov-file#docker-support-experimental) \
+Build and run the Docker container for **Android Lab** following: [🔗lab docker setup](https://github.com/THUDM/Android-Lab/blob/main/docs/prepare_for_linux.md)
+### 3. Locally Host Trained Agent for Evaluation
+First, build the VLLM Conda environment compatible with your agent model: 
+<pre><code>conda env create --prefix YOUR_ROOT/DSC180-A08-GUI-Project/online_eval -f vllm_environment.yml
 </code></pre>
-### 2. Build / Run the AndroidWorld Container
-Build and run the Docker container following AndroidWorld's [🔗Docker setup](https://github.com/google-research/android_world?tab=readme-ov-file#docker-support-experimental) \
-Once inside the container:
-<pre><code>cd /workspace/zerogui
-pip install -r requirements.txt (Please use Python >=3.10)</code></pre>
-### 3. Smoke Test
-Open and run the notebook `docker_exp.ipynb` \
-You could play with the action by changing `action_payload`
-<pre><code>action_payload = {"action_type": "open_app", "app_name": "Chrome"}
+Then start the VLLM engine (example below, adjust based on your condition):
+<pre><code>CUDA_VISIBLE_DEVICES=7 vllm serve Qwen/Qwen3-VL-4B-Instruct --trust-remote-code --port 8000 --gpu_memory_utilization 0.75 </code></pre>
+### 4. Start the Evaluation
+Start Android World evaluation by (make sure the port can point to your hosted model): 
+<pre><code>cd YOUR_ROOT/android_world
+docker run --rm --privileged \
+  --network host -it -v "$PWD/runs:/runs" \
+  -e OPENAI_BASE_URL=http://127.0.0.1:8000/v1 \
+  -e OPENAI_MODEL=Qwen/Qwen3-VL-4B-Instruct android-world-fixed:latest python run.py \
+  --output_path=/runs --suite_family=android_world --agent_name=m3a_gpt4v \
+  --openai_base_url http://127.0.0.1:8000/v1 --openai_model Qwen/Qwen3-VL-4B-Instruct --n_task_combinations=1
 </code></pre>
-And you should see the corresponding screenshots/empty reward of your interactions.
+Start Android Lab evaluation by:
+<pre><code>cd YOUR_ROOT/Android-Lab
+conda run -n Android-Lab python eval.py -n qwen3vl4b_run_fix_launch2 -c config.yaml </code></pre>
 
 ## Part VI — Offline Benchmark Evaluation (UI-Vision, MMBench-GUI, Mind2Web, AndroidControl)
 
-🎯 **Goal:** Evaluate the base model or LoRA-trained agent on four offline benchmarks (UI-Vision, MMBench-GUI, Mind2Web, AndroidControl) so we can compare before/after training. \
+🎯 **Goal:** Evaluate the base model and LoRA-trained agent on four offline benchmarks (UI-Vision, MMBench-GUI, Mind2Web, AndroidControl) so we can compare before/after training. \
 📈 **Deliverable:** Scripts, config, and environment in <code>benchmark_runner/</code>; data from HuggingFace, paths under <code>PATH_TO/data/...</code>.
 
 ### 1. Project layout
