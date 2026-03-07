@@ -1,0 +1,28 @@
+# Conda environment for GUI benchmark evaluation
+# Create: conda env create -f environment.yml
+# Activate: conda activate gui-benchmark
+
+name: gui-benchmark
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pytorch
+  - torchvision
+  - cuda-toolkit=11.8
+  - lxml
+  - pyyaml
+  - pip:
+    - vllm>=0.4.0
+    - transformers
+    - datasets
+    - huggingface-hub
+    - qwen-vl-utils
+    - pillow
+    - tqdm
+    - numpy
+    - pandas
+    - pyarrow
