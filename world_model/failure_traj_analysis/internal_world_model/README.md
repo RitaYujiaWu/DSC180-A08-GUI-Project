@@ -192,7 +192,7 @@ based on:
 - domain
 - recent actions
 - page URL
-- screenshot (optional)
+- screenshot 
 
 Main class:
 
