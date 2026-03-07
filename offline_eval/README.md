@@ -6,7 +6,7 @@ Run **UI-Vision**, **MMBench-GUI**, **Mind2Web**, and **AndroidControl** for a V
 
 ## Requirements
 
-- GPU with enough VRAM (e.g. 1× A100 80GB or similar for single-GPU)
+- GPU with enough VRAM
 - Conda
 
 ## Setup
@@ -17,9 +17,9 @@ Run **UI-Vision**, **MMBench-GUI**, **Mind2Web**, and **AndroidControl** for a V
    - [Mind2Web](https://github.com/OSU-NLP-Group/Mind2Web) (for Mind2Web eval `dom_utils`)
 
 2. **Data**:
-   - UI-Vision / MMBench-GUI: under `InfiGUI-G1/data/` as per their repo.
-   - Mind2Web: download [scores](https://huggingface.co/datasets/osunlp/Mind2Web) and test split; put under `InfiGUI-G1/data/mind2web/` (e.g. `scores_all_data.pkl`, `test_website/`).
-   - AndroidControl: parquet files under `UI-AGILE/android_control/`.
+   - UI-Vision / MMBench-GUI
+   - Mind2Web: download [scores](https://huggingface.co/datasets/osunlp/Mind2Web) and test split
+   - AndroidControl
 
 3. **Environment**:
    ```bash
@@ -48,10 +48,6 @@ chmod +x run_all_benchmarks.sh
 ./run_all_benchmarks.sh my_lora_v1 /path/to/ckpt_ep220
 ```
 
-Results:
-
-- **UI-Vision, MMBench-GUI, Mind2Web**: `InfiGUI-G1/output/<model_name>/<benchmark>/`
-- **AndroidControl**: `benchmark_runner/results/android_control/<model_name>/high|low/`
 
 ## Run a single benchmark
 
@@ -70,19 +66,6 @@ python eval/eval_mind2web.py Qwen/Qwen3-VL-4B-Instruct --split test_website --da
 
 AndroidControl: run `inference_android_control.py` from `UI-AGILE/eval/android_control/` with `--model_path`, `--data_path`, `--output_path`, and optional `--lora_path`.
 
-## Config options (config.yaml)
-
-| Key | Description |
-|-----|-------------|
-| `base_model` | HuggingFace model id or local path |
-| `lora_path` | Optional LoRA adapter dir |
-| `infigui_root` | Path to InfiGUI-G1 repo |
-| `uiagile_root` | Path to UI-AGILE repo |
-| `mind2web_repo` | Path to Mind2Web repo (for `src/`) |
-| `prompt` | `strict-grounding` or `infigui-g1` |
-| `batch_size_uivision` | 64 recommended to avoid OOM with LoRA |
-
-## Metrics
 
 - **UI-Vision / MMBench-GUI**: use **scaled** accuracy (coordinates 0–1000 scaled to image size).
 - **Mind2Web**: macro Element Acc, Action F1, Step SR (test_website).
