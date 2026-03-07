@@ -1,4 +1,4 @@
-# Internal World Model (An alternative way for the contrasive_experience folder but share most of files)
+# Internal World Model (A supplement for the contrasive_experience folder and share most of files)
 
 ## Overview
 
