@@ -1,4 +1,4 @@
-# Internal World Model (A supplement based on the contrasive_experience folder and shared most of files)
+# Internal World Model (A supplement based on the contrasive_experience folder and shared most of files )
 
 ## Overview
 
