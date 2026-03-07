@@ -1,0 +1,9 @@
+hand_annotations_file: arc_memo/data/abstract_anno/gui/example_annotations.yaml
+pseudocode_file: arc_memo/output/initial_analysis.json
+example_concepts: arc_memo/data/abstract_anno/gui/example_concepts.yaml
+limit_tasks: null
+model:
+  server_url: http://localhost:8000/v1
+  name: Qwen/Qwen2.5-VL-7B-Instruct
+  api_key: EMPTY
+output_dir: arc_memo/output

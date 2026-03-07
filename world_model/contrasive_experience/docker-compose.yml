@@ -1,0 +1,45 @@
+services:
+  gui-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gui-agent:latest
+    container_name: gui-agent-container
+
+    # Enable GPU support (requires nvidia-docker2)
+    # Commented out to allow running without GPU - uncomment if you have nvidia-docker2 installed
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+    # Environment variables
+    environment:
+      # - NVIDIA_VISIBLE_DEVICES=all
+      # - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - DISPLAY=${DISPLAY:-:0}
+
+    # Volume mounts to persist data and share files
+    volumes:
+      - .:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - /home/sibo/CoMEM-Agent/CoMEM-Agent-Inference/mmina:/workspace/CoMEM-Agent-Inference/mmina:ro
+
+    # Network mode
+    network_mode: host
+
+    # Keep container running
+    stdin_open: true
+    tty: true
+
+    # Increase shared memory size for browser operations
+    shm_size: 2gb
+
+    # Working directory
+    working_dir: /workspace
+
+    # Default command
+    command: /bin/bash
