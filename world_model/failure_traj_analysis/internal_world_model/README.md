@@ -77,7 +77,7 @@ Retrieval is conditioned on:
 - domain / website
 - recent actions
 - page URL
-- optionally the current screenshot (multimodal retrieval)
+- the current screenshot
 
 This provides **experience-based evidence** for evaluating candidate actions.
 
