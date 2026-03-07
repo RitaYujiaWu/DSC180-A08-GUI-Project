@@ -2,7 +2,7 @@
 
 Run **UI-Vision**, **MMBench-GUI**, **Mind2Web**, and **AndroidControl** for a VLM (e.g. Qwen3-VL-4B) with optional LoRA.
 
-**Location in repo**: `benchmark_runner/` (this folder). Config: `config.yaml`. Scripts: `scripts/run_all_benchmarks.sh`. Env: `environment.yml`.
+**Location in repo**: `offline_eval/` (this folder). Config: `config.yaml`. Scripts: `scripts/run_all_benchmarks.sh`. Env: `environment.yml`.
 
 ## Requirements
 
