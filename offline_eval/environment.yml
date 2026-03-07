@@ -1,4 +1,4 @@
-# Conda environment for GUI benchmark evaluation
+# Conda environment for GUI benchmark evaluation (Part VI)
 # Create: conda env create -f environment.yml
 # Activate: conda activate gui-benchmark
 

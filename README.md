@@ -213,6 +213,86 @@ You could play with the action by changing `action_payload`
 </code></pre>
 And you should see the corresponding screenshots/empty reward of your interactions.
 
+## Part VI — Offline Benchmark Evaluation (UI-Vision, MMBench-GUI, Mind2Web, AndroidControl)
+
+🎯 **Goal:** Evaluate the base model or LoRA-trained agent on four offline benchmarks (UI-Vision, MMBench-GUI, Mind2Web, AndroidControl) so we can compare before/after training. \
+📈 **Deliverable:** Scripts, config, and environment in <code>benchmark_runner/</code>; data from HuggingFace, paths under <code>PATH_TO/data/...</code>.
+
+### 1. Project layout
+
+Eval scripts and config live in <code>benchmark_runner/</code>. Put all benchmark data under one root, e.g. <code>PATH_TO/data/</code>:
+
+<pre><code>repo-root/
+  benchmark_runner/
+    config.yaml
+    environment.yml
+    scripts/
+      run_all_benchmarks.sh
+    README.md
+
+PATH_TO/data/
+  ui-vision/                      # annotations/element_grounding/, images/
+  MMBench-GUI/                    # L2_annotations.json, MMBench-GUI-OfflineImages/offline_images/
+  mind2web/                       # scores_all_data.pkl, test_website/, test_task/, test_domain/
+  AndroidControl/                 # androidcontrol_high_test.parquet, androidcontrol_low_test.parquet
+</code></pre>
+
+### 2. Data (download from HuggingFace)
+
+| Benchmark | Download | Where to put |
+|-----------|----------|----------------|
+| **UI-Vision** | [ServiceNow/ui-vision](https://huggingface.co/datasets/ServiceNow/ui-vision) | <code>PATH_TO/data/ui-vision/</code> — <code>annotations/element_grounding/</code>, <code>images/</code> |
+| **MMBench-GUI** | [OpenGVLab/MMBench-GUI](https://huggingface.co/datasets/OpenGVLab/MMBench-GUI) — L2_annotations.json, MMBench-GUI-OfflineImages | <code>PATH_TO/data/MMBench-GUI/</code> — <code>L2_annotations.json</code>, <code>MMBench-GUI-OfflineImages/offline_images/</code> |
+| **Mind2Web** | [osunlp/Mind2Web](https://huggingface.co/datasets/osunlp/Mind2Web) — scores_all_data.pkl, test.zip (password: <code>mind2web</code>) | <code>PATH_TO/data/mind2web/</code> — <code>scores_all_data.pkl</code>, unzipped <code>test_website/</code>, <code>test_task/</code>, <code>test_domain/</code> |
+| **AndroidControl** | [smolagents/android-control](https://huggingface.co/datasets/smolagents/android-control) (parquet) | <code>PATH_TO/data/AndroidControl/</code> — <code>androidcontrol_high_test.parquet</code>, <code>androidcontrol_low_test.parquet</code> |
+
+### 3. Environment
+
+<pre><code>cd benchmark_runner
+conda env create -f environment.yml
+conda activate gui-benchmark
+</code></pre>
+
+Or install manually: <code>vllm</code>, <code>transformers</code>, <code>qwen-vl-utils</code>, <code>lxml</code>, <code>datasets</code>, <code>pillow</code>, <code>pyyaml</code>, <code>torch</code>.
+
+### 4. Config
+
+Copy and edit <code>config.yaml</code>; set <code>base_model</code>, data paths, and optional LoRA:
+
+<pre><code>cp config.yaml my_config.yaml
+# Edit: base_model, data paths (PATH_TO/data/...), ac_data_high, ac_data_low, lora_path
+export CONFIG_PATH=$(pwd)/my_config.yaml
+</code></pre>
+
+| Key | Description |
+|-----|-------------|
+| <code>base_model</code> | HuggingFace id (e.g. <code>Qwen/Qwen3-VL-4B-Instruct</code>) or <code>PATH_TO/models/YourModel</code> |
+| <code>data_root</code> | <code>PATH_TO/data</code> (base for ui-vision, MMBench-GUI, mind2web, AndroidControl) |
+| <code>ac_data_high</code> / <code>ac_data_low</code> | <code>PATH_TO/data/AndroidControl/androidcontrol_high_test.parquet</code> (and <code>_low</code>) |
+| <code>lora_path</code> | Optional: <code>PATH_TO/adapters/ckpt_ep220</code> |
+
+### 5. Run all four benchmarks
+
+<pre><code>cd benchmark_runner/scripts
+chmod +x run_all_benchmarks.sh
+
+# Baseline (no LoRA)
+./run_all_benchmarks.sh baseline_v1
+
+# With LoRA
+./run_all_benchmarks.sh my_lora_v1 PATH_TO/adapters/ckpt_ep220
+</code></pre>
+
+Results: under <code>benchmark_runner/results/</code> (or paths set in config).
+
+### 6. Metrics
+
+- **UI-Vision / MMBench-GUI:** scaled accuracy (0–1000 coordinates scaled to image size).
+- **Mind2Web:** macro Element Acc, Action F1, Step SR (test_website).
+- **AndroidControl:** Action Type Acc, Grounding Rate, Step Success Rate (high / low).
+
+See project root <code>RESULTS_SUMMARY.md</code> for result tables.
+
 [(Jump back to Part A)](#a-training-a-process-reward-model-prm-for-gui-agent)
 # B. Training an Internal "World Model" for GUI Agent
 

@@ -1,23 +1,35 @@
 # GUI Benchmark Runner Configuration
 # Copy to config.yaml and set paths for your machine.
+# Use a single root (e.g. PATH_TO) and put data under PATH_TO/data/...
 
-# Base model (HuggingFace id or local path)
+# --- Model ---
+# Base VLM: HuggingFace id (downloads automatically) or local path
 base_model: "Qwen/Qwen3-VL-4B-Instruct"
 
-# Optional: LoRA adapter directory (e.g. ckpt_ep220). Leave empty for baseline.
+# Optional LoRA adapter (directory with adapter_config.json, adapter_model.safetensors). Leave empty for baseline.
 lora_path: ""
 
-# Data
-# - ui-vision: PATH_TO/data/ui-vision/
-# - mmbench-gui: PATH_TO/data/MMBench-GUI/
-# - mind2web: PATH_TO/data/mind2web/ (scores_all_data.pkl + test_website/, etc.)
-# - AndroidControl: PATH_TO/android_control/*.parquet
+# --- Data (download from HuggingFace; see README) ---
+# Base directory for benchmark data. Subdirs: ui-vision, MMBench-GUI, mind2web, AndroidControl
+data_root: "PATH_TO/data"
 
-# Output base (results will be under output/{model_name}/{benchmark}/)
-output_root: null   # null = use ./results/output_root
-ac_output_root: null  # null = use ./results/android_control
+# AndroidControl parquet files (or leave unset if using ac_eval_root/android_control/...)
+ac_data_high: "PATH_TO/data/AndroidControl/androidcontrol_high_test.parquet"
+ac_data_low: "PATH_TO/data/AndroidControl/androidcontrol_low_test.parquet"
 
-# Eval settings
+# --- Eval code roots ---
+# Root for UI-Vision / MMBench-GUI / Mind2Web: must contain eval/ (eval.py, eval_mind2web.py) and data/ (symlink data_root here if separate)
+grounding_eval_root: "PATH_TO/grounding_eval"
+# Root for AndroidControl: must contain inference_android_control.py (e.g. .../eval/android_control/)
+ac_eval_root: "PATH_TO/ac_eval"
+# Optional: path to Mind2Web src/ for dom_utils (used by eval_mind2web.py). Can be PATH_TO/mind2web/src
+dom_utils_path: "PATH_TO/mind2web/src"
+
+# --- Output ---
+output_root: null   # null = use grounding_eval_root/output
+ac_output_root: null
+
+# --- Eval settings ---
 prompt: "strict-grounding"
 batch_size_uivision: 64
 batch_size_mmbench: 128
