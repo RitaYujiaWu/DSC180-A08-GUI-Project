@@ -2,7 +2,7 @@
 <p align="center">
   <strong>DSC180 A08-2 Capstone Project</strong> · 
   <a href="https://ritayujiawu.github.io/DSC180-A08-GUI-Project/"><strong>🖥️ Website</strong></a> · 
-  <a href="TODO"><strong>📝 Report</strong></a> · 
+  <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project/blob/main/asset/Q2_Project_Report.pdf"><strong>📝 Report</strong></a> · 
   <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project/blob/main/asset/A08_2_Poster.pdf"><strong>🤖 Poster</strong></a>
 </p>
 Right now, there’s a lot of excitement around GUI agents, which are AI agents that interact with graphical user interfaces—things like apps, browsers, and operating systems. Therefore, we chose this as our topic and focused on improving the GUI agent performance through inference-time scaling.
