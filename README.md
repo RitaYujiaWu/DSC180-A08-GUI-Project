@@ -1,4 +1,10 @@
-# DSC180 A08 Capstone Project - GUI Agent
+<h1 align="center">Inference-Time Scaling for GUI Agents <br> with Process Reward Models and Internal World Models</h1>
+<p align="center">
+  <strong>DSC180 A08-2 Capstone Project</strong> · 
+  <a href="https://ritayujiawu.github.io/DSC180-A08-GUI-Project/"><strong>🖥️ Website</strong></a> · 
+  <a href="TODO"><strong>📝 Report</strong></a> · 
+  <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project/blob/main/asset/A08_2_Poster.pdf"><strong>🤖 Poster</strong></a>
+</p>
 Right now, there’s a lot of excitement around GUI agents, which are AI agents that interact with graphical user interfaces—things like apps, browsers, and operating systems. Therefore, we chose this as our topic and focused on improving the GUI agent performance through inference-time scaling.
 
 Our team is then split into two groups that strengthen the agent from complementary directions: one group trains a Process Reward Model (PRM) as an external signal [Jump to Part A](#a-training-a-process-reward-model-prm-for-gui-agent), while the other develops an internal world model to enhance the agent’s own reasoning [Jump to Part B](#b-training-an-internal-world-model-for-gui-agent).
