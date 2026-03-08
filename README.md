@@ -400,10 +400,6 @@ The agent requires two model servers:
 - **Main Agent Model** (Qwen2.5-VL)
 - **Grounding Model** (UI-Ins)
 
-Follow the full setup guide here:
-
-👉 
-
 Example launch commands:
 
 ```bash
@@ -485,11 +481,7 @@ Multi-domain web navigation across **15+ real websites**, including:
 - **Information**: ArXiv, Wikipedia, BBC News  
 - **Services**: Booking, GitHub, Google Maps  
 
-Dataset files are located in:
-
-```
-webvoyager_evaluation/
-```
+Dataset files are available from **[Hugging Face](https://huggingface.co/datasets/WenyiWU0111/CoMEM-agent-memory-trajectories)**.
 
 ---
 
