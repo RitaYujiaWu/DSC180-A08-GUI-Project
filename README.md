@@ -369,6 +369,173 @@ world_model/
     └── early_stop.py                   # Early stopping detection
 ```
 
+## 🚀 Quick Start
+
+This guide shows how to set up the environment, start the model servers, and run evaluations on the GUI benchmarks (MMInA, Mind2Web, and WebVoyager).
+
+---
+
+### 1️⃣ Environment Setup
+
+Install Python dependencies:
+
+```bash
+pip install -r requirements_web.txt
+playwright install
+```
+
+The system depends on:
+
+- **Playwright** for browser automation
+- **FAISS** for trajectory retrieval
+- **CLIP / Transformers** for embeddings
+- **vLLM** for fast LLM serving
+
+---
+
+### 2️⃣ Start vLLM Servers
+
+The agent requires two model servers:
+
+- **Main Agent Model** (Qwen2.5-VL)
+- **Grounding Model** (UI-Ins)
+
+Follow the full setup guide here:
+
+👉 
+
+Example launch commands:
+
+```bash
+# Terminal 1 — Main Agent Model
+conda activate gui-agent
+CUDA_VISIBLE_DEVICES=4,5 python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen2.5-VL-7B-Instruct \
+    --port 8010 \
+    --tensor-parallel-size 2 \
+    --max-model-len 81920 \
+    --gpu-memory-utilization 0.9
+
+# Terminal 2 — Grounding Model
+conda activate gui-agent
+CUDA_VISIBLE_DEVICES=6,7 python -m vllm.entrypoints.openai.api_server \
+    --model Tongyi-MiA/UI-Ins-7B \
+    --port 8011 \
+    --tensor-parallel-size 2 \
+    --max-model-len 81920 \
+    --gpu-memory-utilization 0.9
+```
+
+Verify servers:
+
+```bash
+curl http://localhost:8010/v1/models
+curl http://localhost:8011/v1/models
+```
+
+---
+
+### 3️⃣ Run Evaluations
+
+Once the servers are running, you can start agent evaluations.
+
+#### Example: Run a Single Domain
+
+```bash
+python run.py \
+  --model qwen2.5-vl \
+  --eval_type mmina \
+  --domain shopping \
+  --use_world_model \
+  --use_memory
+```
+
+#### Run All Domains
+
+```bash
+bash run_all_domains.sh
+```
+
+#### Parallel Evaluation
+
+```bash
+python run_chunks.py --chunk_id 0 --num_chunks 4
+```
+
+---
+
+### 4️⃣ Supported Benchmarks
+
+The system evaluates GUI agents on multiple real-world benchmarks:
+
+#### MMInA
+- **Shopping** (200 tasks): E-commerce interaction
+- **Wikipedia** (308 tasks): Information retrieval
+
+#### Mind2Web
+Cross-website task execution:
+- `test_website` — general websites  
+- `test_domain_Info` — information domains  
+- `test_domain_Service` — service domains  
+
+#### WebVoyager
+Multi-domain web navigation across **15+ real websites**, including:
+
+- **E-commerce**: Amazon, Apple  
+- **Information**: ArXiv, Wikipedia, BBC News  
+- **Services**: Booking, GitHub, Google Maps  
+
+Dataset files are located in:
+
+```
+webvoyager_evaluation/
+```
+
+---
+
+### 5️⃣ Compute Success Rates
+
+After running evaluations:
+
+```bash
+python compute_success_rate.py \
+  --result_dir results/mmina/shopping/qwen2.5-vl/<run_id>
+```
+
+Or automatically detect recent runs:
+
+```bash
+python compute_success_rate.py \
+  --eval_type mmina \
+  --domain shopping \
+  --recent 5 \
+  --verbose
+```
+
+---
+
+### 6️⃣ Docker Setup (Optional)
+
+Docker provides an isolated environment with all dependencies pre-installed.
+
+```bash
+# Build container
+./docker-run.sh build
+
+# Start container
+./docker-run.sh start
+
+# Enter container
+./docker-run.sh shell
+```
+
+All required dependencies (Playwright, FAISS, system libraries) will be installed inside the container.
+
+---
+
+After completing these steps, you are ready to run GUI agent experiments with memory retrieval and contrastive world models.
+
+
 ## Part I — Contrastive Experience Learning
 
 ### Key Features
