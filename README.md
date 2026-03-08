@@ -4,6 +4,12 @@ Right now, there’s a lot of excitement around GUI agents, which are AI agents 
 Our team is then split into two groups that strengthen the agent from complementary directions: one group trains a Process Reward Model (PRM) as an external signal [Jump to Part A](#a-training-a-process-reward-model-prm-for-gui-agent), while the other develops an internal world model to enhance the agent’s own reasoning [Jump to Part B](#b-training-an-internal-world-model-for-gui-agent).
 
 # A. Training a Process Reward Model (PRM) for GUI Agent
+
+## Install the Dependencies
+<pre><code>conda create -n prm python=3.10 -y
+conda activate prm
+pip install -r requirements_prm.txt</code></pre>
+
 ## Part I — Task Generation and Collecting Agent Trajectory (Based on ZeroGUI and OSWorld's framework)
 🎯 **Goal:** Use ZeroGUI's prompt for task generation based on OSWorld's tasks and then collect trajectory using Qwen3VL-4b as agent. \
 📈 **Next Step:** Passing all the generated trajectories to the Reward labeling part and preparing for the fine-tuning.
