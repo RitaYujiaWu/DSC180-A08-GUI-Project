@@ -1,7 +1,7 @@
 <h1 align="center">Inference-Time Scaling for GUI Agents <br> with Process Reward Models and Internal World Models</h1>
 <p align="center">
   <strong>DSC180 A08-2 Capstone Project</strong> · 
-  <a href="https://ritayujiawu.github.io/DSC180-A08-GUI-Project/"><strong>🖥️ Website</strong></a> · 
+  <a href="https://ritayujiawu.github.io/DSC180-A08-GUI-Project/"><strong>🖥️ Website</strong></a> (source: <a href="docs/"><code>docs/</code></a>) · 
   <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project/blob/main/asset/Q2_Project_Report.pdf"><strong>📝 Report</strong></a> · 
   <a href="https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project/blob/main/asset/A08_2_Poster.pdf"><strong>🤖 Poster</strong></a>
 </p>
