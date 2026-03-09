@@ -371,13 +371,32 @@ world_model/
 
 ## 🚀 Quick Start
 
-This guide shows how to set up the environment, start the model servers, and run evaluations on the GUI benchmarks (MMInA, Mind2Web, and WebVoyager).
+This guide shows how to set up the environment, start the model servers, and run evaluations on the GUI benchmarks (**MMInA**, **Mind2Web**, and **WebVoyager**).
 
 ---
 
-### 1️⃣ Environment Setup
+## 1️⃣ Docker Setup (Recommended)
 
-Install Python dependencies:
+Docker provides an isolated environment with all dependencies pre-installed, including Playwright, FAISS, and system libraries.
+
+```bash
+# Build the container
+./docker-run.sh build
+
+# Start the container
+./docker-run.sh start
+
+# Enter the container
+./docker-run.sh shell
+```
+
+Once inside the container, all dependencies are already installed and ready to use.
+
+---
+
+## 2️⃣ Local Setup (Optional)
+
+If you prefer running without Docker, install dependencies manually:
 
 ```bash
 pip install -r requirements_web.txt
@@ -386,25 +405,24 @@ playwright install
 
 The system depends on:
 
-- **Playwright** for browser automation
-- **FAISS** for trajectory retrieval
-- **CLIP / Transformers** for embeddings
-- **vLLM** for fast LLM serving
+- **Playwright** — browser automation
+- **FAISS** — trajectory retrieval
+- **CLIP / Transformers** — embedding models
+- **vLLM** — fast LLM inference server
 
 ---
 
-### 2️⃣ Start vLLM Servers
+## 3️⃣ Start vLLM Servers
 
 The agent requires two model servers:
 
 - **Main Agent Model** (Qwen2.5-VL)
 - **Grounding Model** (UI-Ins)
 
-Example launch commands:
+Start them in **two separate terminals**.
 
 ```bash
 # Terminal 1 — Main Agent Model
-conda activate gui-agent
 CUDA_VISIBLE_DEVICES=4,5 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen2.5-VL-7B-Instruct \
     --port 8010 \
@@ -413,7 +431,6 @@ CUDA_VISIBLE_DEVICES=4,5 python -m vllm.entrypoints.openai.api_server \
     --gpu-memory-utilization 0.9
 
 # Terminal 2 — Grounding Model
-conda activate gui-agent
 CUDA_VISIBLE_DEVICES=6,7 python -m vllm.entrypoints.openai.api_server \
     --model Tongyi-MiA/UI-Ins-7B \
     --port 8011 \
@@ -422,20 +439,26 @@ CUDA_VISIBLE_DEVICES=6,7 python -m vllm.entrypoints.openai.api_server \
     --gpu-memory-utilization 0.9
 ```
 
-Verify servers:
+Verify that the servers are running:
 
 ```bash
 curl http://localhost:8010/v1/models
 curl http://localhost:8011/v1/models
 ```
 
+These servers must remain running while experiments are executed.
+
 ---
 
-### 3️⃣ Run Evaluations
+## 4️⃣ Run Evaluations
 
-Once the servers are running, you can start agent evaluations.
+Navigate to the inference directory:
 
-#### Example: Run a Single Domain
+```bash
+cd world_model/contrasive_experience
+```
+
+### Example: Run a Single Domain
 
 ```bash
 python run.py \
@@ -446,13 +469,13 @@ python run.py \
   --use_memory
 ```
 
-#### Run All Domains
+### Run All Domains
 
 ```bash
 bash run_all_domains.sh
 ```
 
-#### Parallel Evaluation
+### Parallel Evaluation
 
 ```bash
 python run_chunks.py --chunk_id 0 --num_chunks 4
@@ -460,21 +483,21 @@ python run_chunks.py --chunk_id 0 --num_chunks 4
 
 ---
 
-### 4️⃣ Supported Benchmarks
+## 5️⃣ Supported Benchmarks
 
-The system evaluates GUI agents on multiple real-world benchmarks:
+The system evaluates GUI agents on multiple real-world benchmarks.
 
-#### MMInA
+### MMInA
 - **Shopping** (200 tasks): E-commerce interaction
 - **Wikipedia** (308 tasks): Information retrieval
 
-#### Mind2Web
+### Mind2Web
 Cross-website task execution:
 - `test_website` — general websites  
 - `test_domain_Info` — information domains  
 - `test_domain_Service` — service domains  
 
-#### WebVoyager
+### WebVoyager
 Multi-domain web navigation across **15+ real websites**, including:
 
 - **E-commerce**: Amazon, Apple  
@@ -485,7 +508,7 @@ Dataset files are available from **[Hugging Face](https://huggingface.co/dataset
 
 ---
 
-### 5️⃣ Compute Success Rates
+## 6️⃣ Compute Success Rates
 
 After running evaluations:
 
@@ -506,26 +529,7 @@ python compute_success_rate.py \
 
 ---
 
-### 6️⃣ Docker Setup (Optional)
-
-Docker provides an isolated environment with all dependencies pre-installed.
-
-```bash
-# Build container
-./docker-run.sh build
-
-# Start container
-./docker-run.sh start
-
-# Enter container
-./docker-run.sh shell
-```
-
-All required dependencies (Playwright, FAISS, system libraries) will be installed inside the container.
-
----
-
-After completing these steps, you are ready to run GUI agent experiments with memory retrieval and contrastive world models.
+After completing these steps, you are ready to run GUI agent experiments with **experience memory** and **contrastive world models**.
 
 
 ## Part I — Contrastive Experience Learning
