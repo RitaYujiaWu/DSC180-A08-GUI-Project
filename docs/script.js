@@ -47,4 +47,21 @@
       console.log('Add your report PDF URL to the Report link in index.html');
     });
   }
+
+  // BibTeX copy button
+  var bibtexCopy = document.querySelector('.bibtex-copy');
+  var bibtexContent = document.getElementById('bibtex-content');
+  if (bibtexCopy && bibtexContent) {
+    bibtexCopy.addEventListener('click', function () {
+      var text = bibtexContent.textContent || bibtexContent.innerText;
+      navigator.clipboard.writeText(text).then(function () {
+        bibtexCopy.textContent = 'Copied!';
+        bibtexCopy.classList.add('copied');
+        setTimeout(function () {
+          bibtexCopy.textContent = 'Copy';
+          bibtexCopy.classList.remove('copied');
+        }, 2000);
+      });
+    });
+  }
 })();

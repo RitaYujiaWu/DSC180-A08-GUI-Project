@@ -117,6 +117,32 @@ main {
   opacity: 0.95;
 }
 
+.header-link-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.header-link-icon .icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+.header-link-icon .icon svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.site-header .header-link-icon .icon svg {
+  color: #ffffff;
+}
+.site-header .header-link-icon .icon.icon-github svg {
+  fill: #ffffff;
+}
+.site-header .header-link-icon .icon.icon-doc svg,
+.site-header .header-link-icon .icon.icon-poster svg {
+  stroke: #ffffff;
+}
+
 /* Sticky nav */
 .nav-sticky {
   position: sticky;
@@ -356,6 +382,62 @@ code {
   font-size: 0.8rem;
   color: var(--text-muted);
   margin-top: 1rem;
+}
+
+/* BibTeX citation block */
+.bibtex-wrap {
+  position: relative;
+  margin-top: 0.5rem;
+}
+
+.bibtex-copy {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bibtex-copy:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.bibtex-copy.copied {
+  color: #0d9488;
+  border-color: #0d9488;
+}
+
+.bibtex-block {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  padding-top: 2.25rem;
+  margin: 0;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--text);
+  line-height: 1.5;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.bibtex-block code {
+  background: none;
+  padding: 0;
+  border: none;
+  font-size: inherit;
 }
 
 /* Print */
