@@ -694,3 +694,21 @@ pip install transformers torch numpy beautifulsoup4
 4. **Injection**: Insert guidance into agent prompts (system message + user message)
 
 [(Jump back to Part B)](#b-training-an-internal-world-model-for-gui-agent)
+
+---
+
+## BibTeX Citation
+
+If you use this work, please cite:
+
+```bibtex
+@article{wang2025inference,
+  title     = {Inference-Time Scaling for GUI Agents with Process Reward
+               Models and Internal World Models},
+  author    = {Wang, Bella and Wu, Rita Yujia and Liu, Shuchang and
+               Huang, Ziyu},
+  year      = {2025},
+  url       = {https://github.com/RitaYujiaWu/DSC180-A08-GUI-Project},
+  note      = {DSC180 A08 Capstone. Mentors: Kun Zhou, Zhiting Hu.},
+}
+```
